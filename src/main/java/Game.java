@@ -20,6 +20,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class Game implements Runnable {
 
@@ -30,11 +33,25 @@ public class Game implements Runnable {
     Logger logger = Logger.getLogger(Game.class);
     Instant currentRoundStartTime, currentRoundHalfTime, currentRoundQuarterTime, currentRoundEndTime;
     private volatile BigInteger finalBlockNumber;
+    private ScheduledExecutorService scheduledExecutorService = null;
+    private class finalBlockRecorder implements Runnable {
+        @Override
+        public void run() {
+            if(Instant.now().compareTo(currentRoundEndTime) <= 0) {
+                try {
+                    finalBlockNumber = web3j.ethBlockNumber().send().getBlockNumber();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
 
     // Blockchain Related Stuff
     private final String shotWallet;
     private final String[] RTKContractAddresses;
     private final BigInteger shotCost;
+    private final BigInteger decimals = new BigInteger("1000000000000000000");
     private final Disposable[] disposable;
     private final ArrayList<String> webSocketUrls = new ArrayList<>();
     private WebSocketService webSocketService;
@@ -42,7 +59,6 @@ public class Game implements Runnable {
     private ArrayList<TransactionData> validTransactions = new ArrayList<>();
     private final String[] prevHash = {null, null, null, null, null};
     private boolean shouldTryToEstablishConnection = true;
-    private final Thread finalBlockRecorder;
 
     // Constructor
     Game(Deadline_Chaser_Bot deadline_chaser_bot, long chat_id, String EthNetworkType, String shotWallet, String[] RTKContractAddresses,
@@ -63,24 +79,6 @@ public class Game implements Runnable {
         webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/b05a1fe6f7b64750a10372b74dec074f");
         webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/2e98f2588f85423aa7bced2687b8c2af");
         /////
-
-        finalBlockRecorder = new Thread() {
-            @Override
-            public void run() {
-                super.run();
-                try {
-                    while(!Thread.interrupted() && Instant.now().compareTo(currentRoundEndTime) <= 0) {
-                        if(Instant.now().compareTo(currentRoundEndTime) > 0) {
-                            return;
-                        }
-                        finalBlockNumber = web3j.ethBlockNumber().send().getBlockNumber();
-                        performProperWait(0.8);
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        };
     }
 
     @Override
@@ -90,10 +88,18 @@ public class Game implements Runnable {
         boolean halfWarn, quarterWarn;
         int halfValue, quarterValue;
 
-        // Not yet complete....
-        // Send some msg to chat regarding some wait before the game start.
-
-        buildCustomBlockchainReader(true);
+        deadline_chaser_bot.sendMessage(chat_id, "Welcome to Deadline Chaser game. The game will start within 10 seconds. Hang on!!!");
+        performProperWait(1.5);
+        if(!buildCustomBlockchainReader(true)) {
+            deadline_chaser_bot.sendMessage(chat_id, "Error encountered while trying to connect to ethereum network. Cancelling the" +
+                    "game.");
+            deadline_chaser_bot.deleteGame(chat_id);
+            return;
+        }
+        deadline_chaser_bot.sendMessage(chat_id, "Note :- \n\nEach shot is counted as valid IF\n 1) Shot cost is " +
+                shotCost.divide(decimals) + " RTK or RTKLX\n2) It is sent to the below address :-");
+        performProperWait(0.5);
+        deadline_chaser_bot.sendMessage(chat_id, shotWallet);
 
         for(; roundCount <= 3; roundCount++) {
             currentRoundStartTime = Instant.now();
@@ -123,9 +129,12 @@ public class Game implements Runnable {
             halfWarn = true;
             quarterWarn = true;
             finalBlockNumber = null;
-            finalBlockRecorder.start();
+            scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+            scheduledExecutorService.scheduleAtFixedRate(new finalBlockRecorder(), 0, 800, TimeUnit.MILLISECONDS);
             boolean furtherCountNecessary = true;
             TransactionData transactionData = null;
+            deadline_chaser_bot.sendMessage(chat_id, "Round " + roundCount + " Started!!!! Start Shooting...");
+            performProperWait(2);
 
             MID :
             while(Instant.now().compareTo(currentRoundEndTime) <= 0) {
@@ -170,8 +179,8 @@ public class Game implements Runnable {
                     }
                 }
             }
-            if(!finalBlockRecorder.isInterrupted()) {
-                finalBlockRecorder.interrupt();
+            if(!scheduledExecutorService.isShutdown()) {
+                scheduledExecutorService.shutdownNow();
             }
 
             if(furtherCountNecessary) {
@@ -199,12 +208,6 @@ public class Game implements Runnable {
                     performProperWait(1);
                 }
             }
-
-            if(roundCount != 3) {
-                // Not yet Complete
-                // Send a message to the chat notifying that next round will now start...
-            }
-
         }
 
         for(int i = 0; i < 5; i++) {
@@ -212,6 +215,9 @@ public class Game implements Runnable {
                 disposable[i].dispose();
             }
         }
+
+        performProperWait(1);
+        deadline_chaser_bot.sendMessage(chat_id, "All rounds have finished. Winner of the game is : " + finalSender);
 
         deadline_chaser_bot.deleteGame(chat_id);
     }

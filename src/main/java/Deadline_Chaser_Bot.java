@@ -13,8 +13,6 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import org.web3j.crypto.WalletUtils;
-
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,8 +38,7 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
     private final MongoCollection botControlCollection;
     Document botNameDoc, foundBotNameDoc;
 
-    // Game User Status
-    final ArrayList<Integer> playersPlayingAGame = new ArrayList<>();
+    // All Games Status
     public HashMap<Long, Game> currentlyActiveGames = new HashMap<>();
     ExecutorService executorService = Executors.newCachedThreadPool();
 
@@ -125,7 +122,7 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
                 return;
             }
             switch (inputMsg[0]) {
-                case "/startgame", "/startgame@Hell_Gates_Bot" -> {
+                case "/startgame", "/startgame@Deadline_Chaser_Bot" -> {
                     SendMessage sendMessage = new SendMessage();
                     boolean shouldSend = true;
                     if (update.getMessage().getChat().isGroupChat() || update.getMessage().getChat().isSuperGroupChat()) {
@@ -166,7 +163,7 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
                         }
                     }
                 }
-                case "/rules", "/rules@Hell_Gates_Bot" -> {
+                case "/rules", "/rules@Deadline_Chaser_Bot" -> {
                     SendMessage sendMessage = new SendMessage();
                     if (!update.getMessage().getChat().isUserChat()) {
                         sendMessage.setText("Please use this command in private chat @" + getBotUsername());
@@ -284,9 +281,5 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
 
     public long getAdminChatId() {
         return 607901021;
-    }
-
-    public void playerRemovedFromGame(int playerID) {
-        playersPlayingAGame.remove((Integer) playerID);
     }
 }
