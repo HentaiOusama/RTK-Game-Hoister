@@ -33,7 +33,6 @@ public class Game implements Runnable {
     Logger logger = Logger.getLogger(Game.class);
     Instant currentRoundStartTime, currentRoundHalfTime, currentRoundQuarterTime, currentRoundEndTime;
     private volatile BigInteger finalBlockNumber;
-    private ScheduledExecutorService scheduledExecutorService = null;
     private class finalBlockRecorder implements Runnable {
         @Override
         public void run() {
@@ -79,6 +78,10 @@ public class Game implements Runnable {
         webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/b05a1fe6f7b64750a10372b74dec074f");
         webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/2e98f2588f85423aa7bced2687b8c2af");
         /////
+
+        if (EthNetworkType.equalsIgnoreCase("ropsten")) {
+            deadline_chaser_bot.sendMessage(chat_id, "Warning! The bot is running on Ropsten network and not on Mainnet.");
+        }
     }
 
     @Override
@@ -129,7 +132,7 @@ public class Game implements Runnable {
             halfWarn = true;
             quarterWarn = true;
             finalBlockNumber = null;
-            scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+            ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
             scheduledExecutorService.scheduleAtFixedRate(new finalBlockRecorder(), 0, 800, TimeUnit.MILLISECONDS);
             boolean furtherCountNecessary = true;
             TransactionData transactionData = null;
