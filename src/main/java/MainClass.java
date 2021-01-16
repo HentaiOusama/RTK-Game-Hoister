@@ -39,7 +39,7 @@ public class MainClass {
     private static final String[] RTKContractAddresses = {"0x38332D8671961aE13d0BDe040d536eB336495eEA",
             "0x9C72573A47b0d81Ef6048c320bF5563e1606A04C", "0x136A5c9B9965F3827fbB7A9e97E41232Df168B08",
             "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8", "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d"};
-    private static final BigInteger shotCost = new BigInteger("10000000000000000000");
+    private static final BigInteger shotCost = new BigInteger("100000000000000000000");
 
     public static void main(String[] args) {
         BasicConfigurator.configure();

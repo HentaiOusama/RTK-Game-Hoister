@@ -5,22 +5,17 @@ import com.mongodb.client.MongoDatabase;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
-import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendAnimation;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.Update;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+@SuppressWarnings("SpellCheckingInspection")
 public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
 
     // Game manager variable
@@ -35,8 +30,8 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
 
     // MongoDB Related Stuff
     private final String botName = "Deadline Chaser Bot";
-    private final MongoCollection botControlCollection;
-    Document botNameDoc, foundBotNameDoc;
+    private final MongoCollection botControlCollection, walletDistributionCollection;
+    Document botNameDoc, foundBotNameDoc, walletDetailDoc, foundWalletDetailDoc;
 
     // All Games Status
     public HashMap<Long, Game> currentlyActiveGames = new HashMap<>();
@@ -54,6 +49,7 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
         String botControlDatabaseName = "All-Bots-Command-Centre";
         MongoDatabase botControlDatabase = mongoClient.getDatabase(botControlDatabaseName);
         botControlCollection = botControlDatabase.getCollection("MemberValues");
+        walletDistributionCollection = mongoClient.getDatabase("Deadline-Chaser-Bot-Database").getCollection("WalletBalanceDistribution");
         botNameDoc = new Document("botName", botName);
         foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
         assert foundBotNameDoc != null;
@@ -75,7 +71,9 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
                         botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
                     } else if(text.equalsIgnoreCase("Switch to mainnet")) {
                         EthNetworkType = "mainnet";
-                        RTKContractAddresses = new String[]{"0x1F6DEADcb526c4710Cf941872b86dcdfBbBD9211", ""}; // Not yet Complete
+                        RTKContractAddresses = new String[]{"0x1F6DEADcb526c4710Cf941872b86dcdfBbBD9211",
+                                "0x66bc87412a2d92a2829137ae9dd0ee063cd0f201", "0xb0f87621a43f50c3b7a0d9f58cc804f0cdc5c267",
+                                "0x4a1c95097473c54619cb0e22c6913206b88b9a1a", "0x63b9713df102ea2b484196a95cdec5d8af278a60"};
                     }
                     else if (text.equalsIgnoreCase("Switch to ropsten")) {
                         EthNetworkType = "ropsten";
@@ -96,10 +94,32 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
                                 "to see how many games are active and then switch when there are no games active games and ticket buyers.");
                     } else if(text.equalsIgnoreCase("ActiveProcesses")) {
                         sendMessage(getAdminChatId(), "Active Games : " + currentlyActiveGames.size());
+                    } else if(text.startsWith("setPot")) {
+                        try {
+                            BigInteger amount = new BigInteger(text.split(" ")[1]);
+                            setWalletBalance(amount.toString());
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            sendMessage(update.getMessage().getChatId(), "Correct Format :- setPot amount\namount has to be BigInteger");
+                        }
+                    } else if(text.startsWith("amountPulledOutFromFeesBalance")) {
+                        try {
+                            String amount = text.split(" ")[1];
+                            if(amount.contains("-")) {
+                                throw new Exception("Value Cannot be negative");
+                            }
+                            addAmountToWalletFeesBalance("-" + amount);
+                        } catch (Exception e) {
+                            sendMessage(update.getMessage().getChatId(), "Correct Format :- amountPulledOutFromFeesBalance amount\n" +
+                                    "amount has to be a POSITIVE BigInteger");
+                        }
                     }
                     else if(text.equalsIgnoreCase("Commands")) {
                         sendMessage(update.getMessage().getChatId(), "Run\nSwitch to mainnet\nSwitch to ropsten\nStopBot\nStartServerSwitchProcess\n" +
-                                "ActiveProcesses\nCommands");
+                                "ActiveProcesses\nsetPot amount\namountPulledOutFromFeesBalance amount\nCommands\n\n(amount has to be bigInteger including " +
+                                "18 decimal eth precision)");
+                    } else {
+                        sendMessage(update.getMessage().getChatId(), "Such command does not exists. RETARD");
                     }
                     sendMessage(update.getMessage().getChatId(), "shouldRunGame = " + shouldRunGame + "\nEthNetworkType = " + EthNetworkType +
                             "\nRTKContractAddresses = " + Arrays.toString(RTKContractAddresses) + "\n" + "WaitingToSwitchServers = " + waitingToSwitchServers);
@@ -168,7 +188,7 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
                     if (!update.getMessage().getChat().isUserChat()) {
                         sendMessage.setText("Please use this command in private chat @" + getBotUsername());
                     } else {
-                        sendMessage.setText(""); // Not yet Complete
+                        sendMessage.setText("Not yet Complete...");
                     }
                     sendMessage.setChatId(chat_id);
                     try {
@@ -214,72 +234,37 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
         }
     } // Normal Message Sender
 
-    public void sendMessage(long chat_id, String msg, int editMessageId, String callbackQueryId) {
-        EditMessageText editMessageText = new EditMessageText().setMessageId(editMessageId);
-        editMessageText.setChatId(chat_id);
-        editMessageText.setText(msg);
-        AnswerCallbackQuery answerCallbackQuery = new AnswerCallbackQuery();
-        answerCallbackQuery.setCallbackQueryId(callbackQueryId);
-        try {
-            execute(editMessageText);
-            execute(answerCallbackQuery);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
-
-    } // Edit Message Sender
-
-    // Buttoned Message Sender...
-    public void sendMessage(long chat_id, String msg, String[] buttonText, String[] buttonValues, String... url) {
-        if(url.length == 0) {
-            SendMessage sendMessage = new SendMessage();
-            sendMessage.setText(msg);
-            sendMessage.setChatId(chat_id);
-            List<List<InlineKeyboardButton>> rowsInLine = new ArrayList<>();
-            List<InlineKeyboardButton> rowInLine = new ArrayList<>();
-            InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
-            for(int i = 0; i < buttonText.length; i++) {
-                rowInLine.add(new InlineKeyboardButton().setText(buttonText[i]).setCallbackData(buttonValues[i]));
-            }
-            rowsInLine.add(rowInLine);
-            inlineKeyboardMarkup.setKeyboard(rowsInLine);
-            sendMessage.setReplyMarkup(inlineKeyboardMarkup);
-            try {
-                execute(sendMessage);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        } else {
-            SendAnimation sendAnimation = new SendAnimation();
-            sendAnimation.setAnimation(url[(int)(Math.random()*(url.length))]);
-            sendAnimation.setCaption(msg);
-            sendAnimation.setChatId(chat_id);
-            List<List<InlineKeyboardButton>> rowsInLine = new ArrayList<>();
-            List<InlineKeyboardButton> rowInLine = new ArrayList<>();
-            InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
-            for(int i = 0; i < buttonText.length; i++) {
-                rowInLine.add(new InlineKeyboardButton().setText(buttonText[i]).setCallbackData(buttonValues[i]));
-            }
-            rowsInLine.add(rowInLine);
-            inlineKeyboardMarkup.setKeyboard(rowsInLine);
-            sendAnimation.setReplyMarkup(inlineKeyboardMarkup);
-            try {
-                execute(sendAnimation);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    public void executeAnswerCallbackQuery(AnswerCallbackQuery answerCallbackQuery) throws TelegramApiException {
-        execute(answerCallbackQuery);
-    }
-
     public void deleteGame(long chat_id) {
         currentlyActiveGames.remove(chat_id);
     }
 
     public long getAdminChatId() {
         return 607901021;
+    }
+
+    public void setWalletBalance(String amount) {
+        walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
+        foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+        Bson updateWalletDoc = new Document("totalRTKBalanceForPool", amount);
+        Bson updateWalletDocOperation = new Document("$set", updateWalletDoc);
+        walletDistributionCollection.updateOne(foundWalletDetailDoc, updateWalletDocOperation);
+    }
+
+    public String getTotalRTKForPoolInWallet() {
+        walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
+        foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+        assert foundWalletDetailDoc != null;
+        return (String) foundWalletDetailDoc.get("totalRTKBalanceForPool");
+    }
+
+    public void addAmountToWalletFeesBalance(String amount) {
+        walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
+        foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+        assert foundWalletDetailDoc != null;
+        BigInteger balance = new BigInteger((String) foundWalletDetailDoc.get("balanceCollectedAsFees"));
+        balance = balance.add(new BigInteger(amount));
+        Bson updateWalletDoc = new Document("balanceCollectedAsFees", balance);
+        Bson updateWalletDocOperation = new Document("$set", updateWalletDoc);
+        walletDistributionCollection.updateOne(foundWalletDetailDoc, updateWalletDocOperation);
     }
 }
