@@ -39,14 +39,18 @@ public class Game implements Runnable {
     private final Deadline_Chaser_Bot deadline_chaser_bot;
     private final long chat_id;
     Logger logger = Logger.getLogger(Game.class);
-    Instant currentRoundStartTime, currentRoundHalfTime, currentRoundQuarterTime, currentRoundEndTime;
-    private volatile BigInteger finalBlockNumber;
+    public volatile boolean isGameRunning = false;
+    private volatile boolean shouldContinueGame = true;
+    private volatile Instant currentRoundEndTime;
+    private volatile BigInteger finalLatestBlockNumber = null;
+    private volatile TransactionData penultimateCompletedBlock = null;
+
     private class finalBlockRecorder implements Runnable {
         @Override
         public void run() {
-            if(Instant.now().compareTo(currentRoundEndTime) <= 0) {
+            if (Instant.now().compareTo(currentRoundEndTime) <= 0) {
                 try {
-                    finalBlockNumber = web3j.ethBlockNumber().send().getBlockNumber();
+                    finalLatestBlockNumber = web3j.ethBlockNumber().send().getBlockNumber();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -99,20 +103,12 @@ public class Game implements Runnable {
     @Override
     public void run() {
 
-        if(!hasEnoughBalance()) {
-            deadline_chaser_bot.sendMessage(chat_id, "Rewards Wallet " + shotWallet + " doesn't have enough eth for transactions. " +
-                    "Please contact admins. Closing Game\n\nMinimum eth required : " + new BigDecimal(minGasFees).divide(
-                            new BigDecimal("1000000000000000000"), 3, RoundingMode.HALF_EVEN));
-            deadline_chaser_bot.deleteGame(chat_id);
-            return;
-        }
+        TransactionData lastCheckedTransactionData = deadline_chaser_bot.getLastCheckedTransactionDetails();
 
-        ArrayList<TransactionData> transactionsUnderReview = new ArrayList<>();
-        String finalSender = null;
-        boolean halfWarn, quarterWarn;
-        int halfValue, quarterValue;
+        ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+        scheduledExecutorService.scheduleAtFixedRate(new finalBlockRecorder(), 0, 800, TimeUnit.MILLISECONDS);
 
-        deadline_chaser_bot.sendMessage(chat_id, "Welcome to Deadline Chaser game. The game will start within 10 seconds. Hang on!!!");
+        deadline_chaser_bot.sendMessage(chat_id, "Welcome to Deadline Chaser game. The bot will now start reading transactions.");
         performProperWait(1.5);
         deadline_chaser_bot.sendMessage(chat_id, "Note :- \n\nEach shot is counted as valid IF\n 1) Shot cost is " +
                 shotCost.divide(decimals) + " RTK or RTKLX\n2) It is sent to the below address :-");
@@ -120,19 +116,39 @@ public class Game implements Runnable {
         deadline_chaser_bot.sendMessage(chat_id, shotWallet);
         performProperWait(1.5);
 
+        ArrayList<TransactionData> transactionsUnderReview = new ArrayList<>();
+        String finalSender = null;
+        boolean halfWarn, quarterWarn;
+        int halfValue, quarterValue;
 
-        do {
-            netCurrentPool = new BigInteger(deadline_chaser_bot.getTotalRTKForPoolInWallet());
-            prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
+        if (!buildCustomBlockchainReader(true)) {
+            deadline_chaser_bot.sendMessage(chat_id, "Error encountered while trying to connect to ethereum network. Cancelling the" +
+                    "game.");
+            deadline_chaser_bot.deleteGame(chat_id);
+            return;
+        }
 
-            if (!buildCustomBlockchainReader(true)) {
-                deadline_chaser_bot.sendMessage(chat_id, "Error encountered while trying to connect to ethereum network. Cancelling the" +
-                        "game.");
+        while (shouldContinueGame) {
+            if (!hasEnoughBalance()) {
+                deadline_chaser_bot.sendMessage(chat_id, "Rewards Wallet " + shotWallet + " doesn't have enough eth for transactions. " +
+                        "Please contact admins. Closing Game\n\nMinimum eth required : " + new BigDecimal(minGasFees).divide(
+                        new BigDecimal("1000000000000000000"), 3, RoundingMode.HALF_EVEN) + ".\n\n\nThe bot will not read any transactions " +
+                        "till the balances is updated by admins.");
                 deadline_chaser_bot.deleteGame(chat_id);
                 return;
             }
+            if (validTransactions.size() == 0 && transactionsUnderReview.size() == 0) {
+                performProperWait(1);
+                continue;
+            }
+
+            isGameRunning = true;
+            netCurrentPool = new BigInteger(deadline_chaser_bot.getTotalRTKForPoolInWallet());
+            prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
+
             for (int roundCount = 1; roundCount <= 3; roundCount++) {
-                currentRoundStartTime = Instant.now();
+                Instant currentRoundHalfTime, currentRoundQuarterTime;
+                Instant currentRoundStartTime = Instant.now();
                 if (roundCount == 1) {
                     currentRoundHalfTime = currentRoundStartTime.plus(15, ChronoUnit.MINUTES);
                     currentRoundQuarterTime = currentRoundHalfTime.plus(22, ChronoUnit.MINUTES);
@@ -154,9 +170,6 @@ public class Game implements Runnable {
                 }
                 halfWarn = true;
                 quarterWarn = true;
-                finalBlockNumber = null;
-                ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
-                scheduledExecutorService.scheduleAtFixedRate(new finalBlockRecorder(), 0, 800, TimeUnit.MILLISECONDS);
                 boolean furtherCountNecessary = true;
                 TransactionData transactionData = null;
                 deadline_chaser_bot.sendMessage(chat_id, "Round " + roundCount + " Started!!!! \nTime Limit : " +
@@ -186,7 +199,8 @@ public class Game implements Runnable {
                     performProperWait(1.5);
                     while (transactionsUnderReview.size() > 0) {
                         transactionData = transactionsUnderReview.remove(0);
-                        if (finalBlockNumber == null || transactionData.compareBlock(finalBlockNumber) <= 0) {
+                        lastCheckedTransactionData = transactionData;
+                        if (finalLatestBlockNumber == null || transactionData.compareBlock(finalLatestBlockNumber) <= 0) {
                             if (transactionData.didBurn) {
                                 finalSender = transactionData.fromAddress;
                                 deadline_chaser_bot.sendMessage(chat_id, "Someone got shot.\nTrx Hash : " + transactionData.trxHash +
@@ -197,7 +211,7 @@ public class Game implements Runnable {
                                     break MID;
                                 }
                             } else {
-                                addRTKToPot(transactionData.value);
+                                addRTKToPot(transactionData.value, transactionData.fromAddress);
                             }
                         } else {
                             furtherCountNecessary = false;
@@ -219,12 +233,13 @@ public class Game implements Runnable {
 
                     while (transactionsUnderReview.size() > 0) {
                         transactionData = transactionsUnderReview.remove(0);
-                        if (finalBlockNumber == null || transactionData.compareBlock(finalBlockNumber) <= 0) {
+                        lastCheckedTransactionData = transactionData;
+                        if (finalLatestBlockNumber == null || transactionData.compareBlock(finalLatestBlockNumber) <= 0) {
                             if (transactionData.didBurn) {
                                 finalSender = transactionData.fromAddress;
                                 didSomeoneBurned = true;
                             } else {
-                                addRTKToPot(transactionData.value);
+                                addRTKToPot(transactionData.value, transactionData.fromAddress);
                             }
                         } else {
                             break;
@@ -242,38 +257,40 @@ public class Game implements Runnable {
             performProperWait(2);
             sendRewardToWinner(prizePool, finalSender);
 
-            deadline_chaser_bot.setWalletBalance((netCurrentPool.multiply(BigInteger.valueOf(2))).divide(BigInteger.valueOf(5)).toString());
+            deadline_chaser_bot.setTotalRTKForPoolInWallet((netCurrentPool.multiply(BigInteger.valueOf(2))).divide(BigInteger.valueOf(5)).toString());
             deadline_chaser_bot.addAmountToWalletFeesBalance(netCurrentPool.divide(BigInteger.valueOf(10)).toString());
+            deadline_chaser_bot.setLastCheckedTransactionDetails(lastCheckedTransactionData);
+            isGameRunning = false;
+        }
 
-            deadline_chaser_bot.sendMessage(chat_id, "Checking for remaining transactions to start a new game...");
-            performProperWait(7.5);
-            for (int i = 0; i < 5; i++) {
-                if (!disposable[i].isDisposed()) {
-                    disposable[i].dispose();
-                }
+        for (int i = 0; i < 5; i++) {
+            if (!disposable[i].isDisposed()) {
+                disposable[i].dispose();
             }
+        }
+        try {
             web3j.shutdown();
             webSocketService.close();
-
-        } while (transactionsUnderReview.size() != 0 || validTransactions.size() != 0);
-        performProperWait(1.5);
-        deadline_chaser_bot.sendMessage(chat_id, "No remaining transactions were found. Closing all round.");
-        deadline_chaser_bot.deleteGame(chat_id);
-    }
-
-
-    public void performProperWait(double seconds) {
-        try {
-            Thread.sleep((long)(seconds * 1000));
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
 
-    private void addRTKToPot(BigInteger amount) {
-        netCurrentPool = netCurrentPool.add(amount);
-        prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
+    public void performProperWait(double seconds) {
+        try {
+            Thread.sleep((long) (seconds * 1000));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private void addRTKToPot(BigInteger amount, String sender) {
+        if(!sender.equalsIgnoreCase(deadline_chaser_bot.topUpWalletAddress)) {
+            netCurrentPool = netCurrentPool.add(amount);
+            prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
+        }
     }
 
     private String getPrizePool() {
@@ -292,18 +309,18 @@ public class Game implements Runnable {
         currentTransactionData.trxIndex = transaction.getTransactionIndex();
 
         // If method is transfer method
-        if(method.equalsIgnoreCase("0xa9059cbb")) {
+        if (method.equalsIgnoreCase("0xa9059cbb")) {
             currentTransactionData.fromAddress = transaction.getFrom().toLowerCase();
             String topic = log.getTopics().get(0);
-            if(topic.equalsIgnoreCase("0x897c6a07c341708f5a14324ccd833bbf13afacab63b30bbd827f7f1d29cfdff4")) {
+            if (topic.equalsIgnoreCase("0x897c6a07c341708f5a14324ccd833bbf13afacab63b30bbd827f7f1d29cfdff4")) {
                 currentTransactionData.didBurn = true;
-            } else if(topic.equalsIgnoreCase("0xe7d849ade8c22f08229d6eec29ca84695b8f946b0970558272215552d79076e6")) {
+            } else if (topic.equalsIgnoreCase("0xe7d849ade8c22f08229d6eec29ca84695b8f946b0970558272215552d79076e6")) {
                 currentTransactionData.didBurn = false;
             }
-            Method refMethod = TypeDecoder.class.getDeclaredMethod("decode",String.class,int.class,Class.class);
+            Method refMethod = TypeDecoder.class.getDeclaredMethod("decode", String.class, int.class, Class.class);
             refMethod.setAccessible(true);
-            Address toAddress = (Address) refMethod.invoke(null,inputData.substring(10, 74),0,Address.class);
-            Uint256 amount = (Uint256) refMethod.invoke(null,inputData.substring(74),0,Uint256.class);
+            Address toAddress = (Address) refMethod.invoke(null, inputData.substring(10, 74), 0, Address.class);
+            Uint256 amount = (Uint256) refMethod.invoke(null, inputData.substring(74), 0, Uint256.class);
             currentTransactionData.toAddress = toAddress.toString().toLowerCase();
             currentTransactionData.value = amount.getValue();
         } else {
@@ -315,7 +332,7 @@ public class Game implements Runnable {
     private boolean buildCustomBlockchainReader(boolean shouldSendMessage) {
 
         int count = 0;
-        if(shouldSendMessage) {
+        if (shouldSendMessage) {
             deadline_chaser_bot.sendMessage(chat_id, "Connecting to Ethereum Network to read transactions. Please be patient. " +
                     "This can take from few seconds to few minutes");
         }
@@ -353,24 +370,24 @@ public class Game implements Runnable {
 
         try {
             System.out.println("\n\n\n\n\n\n");
-            web3j =  Web3j.build(webSocketService);
+            web3j = Web3j.build(webSocketService);
             Web3ClientVersion web3ClientVersion = web3j.web3ClientVersion().send();
             System.out.println("Game's Chat ID : " + chat_id + "\nWeb3ClientVersion : " + web3ClientVersion.getWeb3ClientVersion());
 
             EthFilter[] RTKContractFilter = new EthFilter[5];
-            for(int i = 0; i < 5; i++) {
+            for (int i = 0; i < 5; i++) {
                 RTKContractFilter[i] = new EthFilter(DefaultBlockParameterName.LATEST, DefaultBlockParameterName.LATEST, RTKContractAddresses[i]);
                 int finalI = i;
                 disposable[i] = web3j.ethLogFlowable(RTKContractFilter[i]).subscribe(log -> {
                     String hash = log.getTransactionHash();
-                    if((prevHash[finalI] == null) || (!prevHash[finalI].equalsIgnoreCase(hash))) {
+                    if ((prevHash[finalI] == null) || (!prevHash[finalI].equalsIgnoreCase(hash))) {
                         Optional<Transaction> trx = web3j.ethGetTransactionByHash(hash).send().getTransaction();
-                        if(trx.isPresent()) {
+                        if (trx.isPresent()) {
                             TransactionData currentTrxData = splitInputData(log, trx.get());
                             currentTrxData.X = finalI + 1;
                             System.out.println("Chat ID : " + chat_id + " - Trx :  " + log.getTransactionHash() + ", X = " + (finalI + 1) +
                                     "Did Burn = " + currentTrxData.didBurn);
-                            if(currentTrxData.toAddress.equalsIgnoreCase(shotWallet) && currentTrxData.value.compareTo(shotCost) >= 0) {
+                            if (currentTrxData.toAddress.equalsIgnoreCase(shotWallet) && currentTrxData.value.compareTo(shotCost) >= 0) {
                                 validTransactions.add(currentTrxData);
                             }
                         }
@@ -393,7 +410,7 @@ public class Game implements Runnable {
         shouldTryToEstablishConnection = true;
     }
 
-    // Not yet complete. This has to be changed and replace with a checker for minimum balance.
+    // Not yet complete. This has to be changed and replace with a checker for minimum balance of RTK.
     private BigInteger getNetRTKWalletBalance() {
         try {
             Collections.shuffle(webSocketUrls);
@@ -415,12 +432,13 @@ public class Game implements Runnable {
             };
             webSocketService = new WebSocketService(webSocketClient, true);
             webSocketService.connect();
-            web3j =  Web3j.build(webSocketService);
+            web3j = Web3j.build(webSocketService);
             BigInteger finalValue = new BigInteger("0");
-            for(int i = 0; i < 5; i++) {
+            for (int i = 0; i < 5; i++) {
                 Function function = new Function("balanceOf",
                         Collections.singletonList(new Address(shotWallet)),
-                        Collections.singletonList(new TypeReference<Uint256>() {}));
+                        Collections.singletonList(new TypeReference<Uint256>() {
+                        }));
 
                 String encodedFunction = FunctionEncoder.encode(function);
                 org.web3j.protocol.core.methods.response.EthCall response = web3j.ethCall(
@@ -481,7 +499,7 @@ public class Game implements Runnable {
                     ", gasPrice = " + gasPrice);
             web3j.shutdown();
             webSocketService.close();
-            if(balance.compareTo(minGasFees) > 0) {
+            if (balance.compareTo(minGasFees) > 0) {
                 retVal = true;
             }
         } catch (Exception e) {
@@ -553,5 +571,9 @@ public class Game implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public void setShouldContinueGame(boolean shouldContinueGame) {
+        this.shouldContinueGame = shouldContinueGame;
     }
 }
