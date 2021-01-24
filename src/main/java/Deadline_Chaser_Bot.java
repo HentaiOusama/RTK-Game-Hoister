@@ -127,7 +127,7 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
                         sendMessage(chatId, "Chats with Active Games : " + currentlyActiveGames.size() +
                                 "\n\nChats with ongoing Round = " + count);
                     }
-                    else if(text.startsWith("setPot")) {
+                    else if(text.toLowerCase().startsWith("setpot")) {
                         Set<Long> keys = currentlyActiveGames.keySet();
                         boolean isAnyGameRunning = false;
                         for(long key : keys) {
@@ -145,9 +145,10 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
                             sendMessage(chatId, "Maybe a Round is active in at least on of the chat. Also maker sure that bot is stopped before using " +
                                     "this command");
                         }
-                    } else if(text.startsWith("getPot")) {
+                    } else if(text.equalsIgnoreCase("getPot")) {
                         sendMessage(chatId, getTotalRTKForPoolInWallet());
-                    } else if(text.startsWith("amountPulledOutFromFeesBalance")) {
+                    }
+                    else if(text.toLowerCase().startsWith("amountpulledoutfromfeesbalance")) {
                         Set<Long> keys = currentlyActiveGames.keySet();
                         boolean isAnyGameRunning = false;
                         for(long key : keys) {
@@ -168,10 +169,10 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
                             sendMessage(chatId, "Maybe a Round is active in at least on of the chat. Also maker sure that bot is stopped before using " +
                                     "this command");
                         }
-                    }
-                    else if(text.startsWith("getFeesBalance")) {
+                    } else if(text.equalsIgnoreCase("getFeesBalance")) {
                         sendMessage(chatId, getWalletFeesBalance());
-                    } else if(text.startsWith("rebuildAdmins")) {
+                    }
+                    else if(text.equalsIgnoreCase("rebuildAdmins")) {
                         allAdmins = new ArrayList<>();
                         Document walletDetailDoc = new Document("identifier", "adminDetails");
                         Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
@@ -184,7 +185,7 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
                                 }
                             }
                         }
-                    } else if(text.startsWith("setTopUpWallet")) {
+                    } else if(text.toLowerCase().startsWith("settopupwallet")) {
                         try {
                             Document document = new Document("identifier", "adminDetails");
                             Document foundDocument = (Document) walletDistributionCollection.find(document).first();
@@ -317,7 +318,7 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
                 e.printStackTrace();
             }
         }
-    } // Normal Message Sender
+    }
 
     public void deleteGame(long chat_id) {
         currentlyActiveGames.remove(chat_id);
