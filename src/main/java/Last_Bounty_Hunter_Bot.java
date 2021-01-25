@@ -15,7 +15,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @SuppressWarnings("SpellCheckingInspection")
-public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
+public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
 
     // Game manager variable
     private boolean shouldRunGame;
@@ -30,7 +30,7 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
     private final BigInteger shotCost;
 
     // MongoDB Related Stuff
-    private final String botName = "Deadline Chaser Bot";
+    private final String botName = "Last Bounty Hunter Bot";
     private final MongoCollection botControlCollection, walletDistributionCollection;
     private Document botNameDoc, foundBotNameDoc, walletDetailDoc, foundWalletDetailDoc;
 
@@ -38,19 +38,19 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
     private final HashMap<Long, Game> currentlyActiveGames = new HashMap<>();
     private final ExecutorService executorService = Executors.newCachedThreadPool();
 
-    Deadline_Chaser_Bot(String EthNetworkType, String shotWallet, String[] RTKContractAddresses, BigInteger shotCost) {
+    Last_Bounty_Hunter_Bot(String EthNetworkType, String shotWallet, String[] RTKContractAddresses, BigInteger shotCost) {
         this.EthNetworkType = EthNetworkType;
         this.shotWallet = shotWallet;
         this.RTKContractAddresses = RTKContractAddresses;
         this.shotCost = shotCost;
         // Mongo Stuff
-        String mongoDBUri = "mongodb+srv://" + System.getenv("deadlineChaserMonoID") + ":" +
-                System.getenv("deadlineChaserMonoPass") + "@hellgatesbotcluster.zm0r5.mongodb.net/test";
+        String mongoDBUri = "mongodb+srv://" + System.getenv("lastBountyHunterMonoID") + ":" +
+                System.getenv("lastBountyHunterMonoPass") + "@hellgatesbotcluster.zm0r5.mongodb.net/test";
         MongoClient mongoClient = new MongoClient(new MongoClientURI(mongoDBUri));
         String botControlDatabaseName = "All-Bots-Command-Centre";
         MongoDatabase botControlDatabase = mongoClient.getDatabase(botControlDatabaseName);
         botControlCollection = botControlDatabase.getCollection("MemberValues");
-        walletDistributionCollection = mongoClient.getDatabase("Deadline-Chaser-Bot-Database").getCollection("WalletBalanceDistribution");
+        walletDistributionCollection = mongoClient.getDatabase("Last-Bounty-Hunter-Bot-Database").getCollection("ManagingData");
         walletDetailDoc = new Document("identifier", "adminDetails");
         foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         assert foundWalletDetailDoc != null;
@@ -228,7 +228,7 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
                 return;
             }
             switch (inputMsg[0]) {
-                case "/startgame", "/startgame@Deadline_Chaser_Bot" -> {
+                case "/startgame", "/startgame@Last_Bounty_Hunter_Bot" -> {
                     SendMessage sendMessage = new SendMessage();
                     boolean shouldSend = true;
                     if (update.getMessage().getChat().isGroupChat() || update.getMessage().getChat().isSuperGroupChat()) {
@@ -269,7 +269,7 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
                         }
                     }
                 }
-                case "/rules", "/rules@Deadline_Chaser_Bot" -> {
+                case "/rules", "/rules@Last_Bounty_Hunter_Bot" -> {
                     SendMessage sendMessage = new SendMessage();
                     if (!update.getMessage().getChat().isUserChat()) {
                         sendMessage.setText("Please use this command in private chat @" + getBotUsername());
@@ -289,12 +289,12 @@ public class Deadline_Chaser_Bot extends TelegramLongPollingBot {
 
     @Override
     public String getBotUsername() {
-        return "Deadline_Chaser_Bot";
+        return "Last_Bounty_Hunter_Bot";
     }
 
     @Override
     public String getBotToken() {
-        return (System.getenv("deadlineChaserBotTokenA") + ":" + System.getenv("deadlineChaserBotTokenB"));
+        return (System.getenv("lastBountyHunterBotTokenA") + ":" + System.getenv("lastBountyHunterBotTokenB"));
     }
 
     public void sendMessage(long chat_id, String msg, String... url) {
