@@ -114,7 +114,7 @@ public class Game implements Runnable {
 
         last_bounty_hunter_bot.sendMessage(chat_id, "Welcome to the Last Bounty Hunter game. The bot will now start reading transactions.");
         performProperWait(1.5);
-        last_bounty_hunter_bot.sendMessage(chat_id, "Note :- \n\nEach shot is counted as valid IF\n 1) Shot cost is " +
+        last_bounty_hunter_bot.sendMessage(chat_id, "Note :- \n\nEach shot is counted as valid IF\n1) Shot cost is " +
                 shotCost.divide(decimals) + " RTK or RTKLX\n2) It is sent to the below address :-");
         performProperWait(0.5);
         last_bounty_hunter_bot.sendMessage(chat_id, shotWallet);
@@ -132,7 +132,7 @@ public class Game implements Runnable {
             return;
         }
 
-        if (!hasEnoughBalance()) {
+        if (notHasEnoughBalance()) {
             last_bounty_hunter_bot.sendMessage(chat_id, "Rewards Wallet " + shotWallet + " doesn't have enough eth for transactions. " +
                     "Please contact admins. Closing Game\n\nMinimum eth required : " + new BigDecimal(minGasFees).divide(
                     new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN) + ". Actual Balance = " + rewardWalletBalance +
@@ -269,7 +269,7 @@ public class Game implements Runnable {
             last_bounty_hunter_bot.addAmountToWalletFeesBalance(netCurrentPool.divide(BigInteger.valueOf(10)).toString());
             last_bounty_hunter_bot.setLastCheckedTransactionDetails(lastCheckedTransactionData);
             isGameRunning = false;
-            if (!hasEnoughBalance()) {
+            if (notHasEnoughBalance()) {
                 last_bounty_hunter_bot.sendMessage(chat_id, "Rewards Wallet " + shotWallet + " doesn't have enough eth for transactions. " +
                         "Please contact admins. Closing Game\n\nMinimum eth required : " + new BigDecimal(minGasFees).divide(
                         new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN) + ". Actual Balance = " + rewardWalletBalance +
@@ -304,7 +304,7 @@ public class Game implements Runnable {
 
 
     private void addRTKToPot(BigInteger amount, String sender) {
-        if(!sender.equalsIgnoreCase(last_bounty_hunter_bot.topUpWalletAddress)) {
+        if (!sender.equalsIgnoreCase(last_bounty_hunter_bot.topUpWalletAddress)) {
             netCurrentPool = netCurrentPool.add(amount);
             prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
         }
@@ -476,7 +476,7 @@ public class Game implements Runnable {
         }
     }
 
-    private boolean hasEnoughBalance() {
+    private boolean notHasEnoughBalance() {
         boolean retVal = false;
 
         try {
@@ -492,7 +492,7 @@ public class Game implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return retVal;
+        return !retVal;
     }
 
     private void sendRewardToWinner(BigInteger amount, String toAddress) {
