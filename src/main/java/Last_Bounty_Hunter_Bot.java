@@ -12,8 +12,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.math.BigInteger;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 @SuppressWarnings("SpellCheckingInspection")
 public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
@@ -23,6 +22,23 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     private ArrayList<Long> allAdmins = new ArrayList<>();
     public volatile String topUpWalletAddress;
     private final long testingChatId = -1001477389485L, actualGameChatId = -1001275436629L;
+    private class messageSender implements Runnable {
+        @Override
+        public void run() {
+            try {
+                TelegramMessage currentMessage = allPendingMessages.take();
+                if ((currentMessage.isMessage)) {
+                    execute(currentMessage.sendMessage);
+                } else {
+                    execute(currentMessage.sendAnimation);
+                }
+                lastSendStatus = currentMessage.sendStatus;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    public volatile int lastSendStatus = -1;
 
     // Blockchain Related Stuff
     private String EthNetworkType;
@@ -35,15 +51,19 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     private final MongoCollection botControlCollection, walletDistributionCollection;
     private Document botNameDoc, foundBotNameDoc, walletDetailDoc, foundWalletDetailDoc;
 
-    // All Games Status
+    // All Data Holders
     private final HashMap<Long, Game> currentlyActiveGames = new HashMap<>();
+    private final LinkedBlockingDeque<TelegramMessage> allPendingMessages = new LinkedBlockingDeque<>();
     private final ExecutorService executorService = Executors.newCachedThreadPool();
+    private final ScheduledExecutorService messageSendingExecuter = Executors.newSingleThreadScheduledExecutor();
+
 
     Last_Bounty_Hunter_Bot(String EthNetworkType, String shotWallet, String[] RTKContractAddresses, BigInteger shotCost) {
         this.EthNetworkType = EthNetworkType;
         this.shotWallet = shotWallet;
         this.shotCost = shotCost;
         this.RTKContractAddresses = RTKContractAddresses;
+
         // Mongo Stuff
         String mongoDBUri = "mongodb+srv://" + System.getenv("lastBountyHunterMonoID") + ":" +
                 System.getenv("lastBountyHunterMonoPass") + "@hellgatesbotcluster.zm0r5.mongodb.net/test";
@@ -52,6 +72,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         MongoDatabase botControlDatabase = mongoClient.getDatabase(botControlDatabaseName);
         botControlCollection = botControlDatabase.getCollection("MemberValues");
         walletDistributionCollection = mongoClient.getDatabase("Last-Bounty-Hunter-Bot-Database").getCollection("ManagingData");
+
         walletDetailDoc = new Document("identifier", "adminDetails");
         foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         assert foundWalletDetailDoc != null;
@@ -65,11 +86,14 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
             }
         }
         System.out.println("TopUpWalletAddress = " + topUpWalletAddress + "\nAdmins = " + allAdmins);
+
         botNameDoc = new Document("botName", botName);
         foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
         assert foundBotNameDoc != null;
         shouldRunGame = (boolean) foundBotNameDoc.get("shouldRunGame");
+
         if (shouldRunGame) {
+            messageSendingExecuter.scheduleWithFixedDelay(new messageSender(),  0, 750, TimeUnit.MILLISECONDS);
             if (EthNetworkType.equals("mainnet")) {
                 Game newGame = new Game(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
                 currentlyActiveGames.put(actualGameChatId, newGame);
@@ -92,6 +116,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     String text = update.getMessage().getText();
                     if (!shouldRunGame && text.equalsIgnoreCase("run")) {
                         try {
+                            messageSendingExecuter.scheduleWithFixedDelay(new messageSender(),  0, 750, TimeUnit.MILLISECONDS);
                             if(EthNetworkType.equals("mainnet") && !currentlyActiveGames.containsKey(actualGameChatId)) {
                                 Game newGame = new Game(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
                                 currentlyActiveGames.put(actualGameChatId, newGame);
@@ -104,10 +129,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                                 throw new Exception();
                             }
                             shouldRunGame = true;
-                            Set<Long> keys = currentlyActiveGames.keySet();
-                            for (long chat_Id : keys) {
-                                currentlyActiveGames.get(chat_Id).setShouldContinueGame(true);
-                            }
                             botNameDoc = new Document("botName", botName);
                             foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
                             Bson updatedAddyDoc = new Document("shouldRunGame", shouldRunGame);
@@ -254,9 +275,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                 }
                 // Can add special operation for admin here
             }
-        }
 
-        if (update.hasMessage()) {
             long chat_id = update.getMessage().getChatId();
             String[] inputMsg = update.getMessage().getText().trim().split(" ");
             if(!shouldRunGame) {
@@ -314,8 +333,35 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         }
     }
 
-    public void deleteGame(long chat_id) {
+    public void enqueueMessageForSend(long chat_id, String msg, int sendStatus, String... url) {
+        try {
+            if (url.length == 0) {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setText(msg);
+                sendMessage.setChatId(chat_id);
+                allPendingMessages.putLast(new TelegramMessage(sendMessage, sendStatus));
+            } else {
+                SendAnimation sendAnimation = new SendAnimation();
+                sendAnimation.setAnimation(url[(int) (Math.random() * (url.length))]);
+                sendAnimation.setCaption(msg);
+                sendAnimation.setChatId(chat_id);
+                allPendingMessages.putLast(new TelegramMessage(sendAnimation, sendStatus));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public int deleteGame(long chat_id) {
+        if(allPendingMessages.size() != 0) {
+            return 0;
+        }
+        if(!messageSendingExecuter.isShutdown()) {
+            messageSendingExecuter.shutdownNow();
+        }
         currentlyActiveGames.remove(chat_id);
+        lastSendStatus = -1;
+        return 1;
     }
 
     public boolean isAdmin(long id) {
