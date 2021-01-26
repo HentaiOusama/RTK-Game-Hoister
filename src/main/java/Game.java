@@ -28,8 +28,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -53,6 +53,18 @@ public class Game implements Runnable {
             }
         }
     }
+    private class webSocketReconnect implements Runnable {
+        @Override
+        public void run() {
+            if(shouldTryToEstablishConnection && transactionsUnderReview.size() == 0 && validTransactions.size() == 0 && webSocketService != null) {
+                try {
+                    buildCustomBlockchainReader(false);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
 
 
     // Managing Variables
@@ -63,6 +75,8 @@ public class Game implements Runnable {
     private volatile Instant currentRoundEndTime;
     private volatile BigInteger finalLatestBlockNumber = null;
     private volatile TransactionData lastCheckedTransactionData = null;
+    private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService scheduledExecutorService2 = Executors.newSingleThreadScheduledExecutor();
 
     // Blockchain Related Stuff
     private final String EthNetworkType, shotWallet;
@@ -72,7 +86,7 @@ public class Game implements Runnable {
     private WebSocketService webSocketService;
     private Web3j web3j;
     private final Disposable[] disposable;
-    private volatile ArrayList<TransactionData> validTransactions = new ArrayList<>();
+    private final ArrayList<TransactionData> validTransactions = new ArrayList<>(), transactionsUnderReview = new ArrayList<>();
     private boolean shouldTryToEstablishConnection = true;
     private BigDecimal rewardWalletBalance;
     private BigInteger gasPrice, minGasFees, netCurrentPool = BigInteger.valueOf(0), prizePool = BigInteger.valueOf(0);
@@ -107,7 +121,6 @@ public class Game implements Runnable {
     public void run() {
         lastCheckedTransactionData = last_bounty_hunter_bot.getLastCheckedTransactionDetails();
 
-        ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
         scheduledExecutorService.scheduleWithFixedDelay(new finalBlockRecorder(), 0, 3000, TimeUnit.MILLISECONDS);
 
         netCurrentPool = new BigInteger(last_bounty_hunter_bot.getTotalRTKForPoolInWallet());
@@ -121,17 +134,18 @@ public class Game implements Runnable {
                 
                 Note :- Each shot is considered to be valid ONLY IF :-
                 1) Shot amount is at least %s RTK or RTKLX
-                2) It is sent to the below address :-""", getPrizePool(), shotCost.divide(decimals)), 0);
+                2) It is sent to the below address :-""", getPrizePool(), shotCost.divide(decimals)), 0,
+                "https://media.giphy.com/media/UNBtv83uhrDrqShIhX/giphy.gif");
         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, shotWallet, 0);
 
-        ArrayList<TransactionData> transactionsUnderReview = new ArrayList<>();
         String finalSender = null;
         boolean halfWarn, quarterWarn;
         int halfValue, quarterValue;
 
-        if (!buildCustomBlockchainReader()) {
+        if (!buildCustomBlockchainReader(true)) {
             last_bounty_hunter_bot.sendMessage(chat_id, "Error encountered while trying to connect to ethereum network. Cancelling the" +
                     "game.");
+
             getCurrentGameDeleted();
             return;
         }
@@ -148,6 +162,8 @@ public class Game implements Runnable {
             return;
         }
 
+        scheduledExecutorService2.scheduleWithFixedDelay(new webSocketReconnect(), 0, 1000, TimeUnit.MILLISECONDS);
+
         checkForStatus(1);
         last_bounty_hunter_bot.sendMessage(chat_id, "Connection Successful... Keep Shooting....");
         performProperWait(1.5);
@@ -162,7 +178,7 @@ public class Game implements Runnable {
 
             // Check for initial Burned Transaction to start the game.
             didSomeoneGotShot = false;
-            TransactionData transactionData = null;
+            TransactionData transactionData;
             while (!validTransactions.isEmpty()) {
                 transactionsUnderReview.add(validTransactions.remove(0));
             }
@@ -178,17 +194,18 @@ public class Game implements Runnable {
                             💥🔫 First blood!!!
                             Hunter %s has the bounty. Shoot him down before he claims it.
                             ⏱ Time limit: 30 minutes
-                            💰Bounty: %s""", finalSender, getPrizePool()), 3);
+                            💰Bounty: %s""", finalSender, getPrizePool()), 3,
+                            "https://media.giphy.com/media/xaMURZrCVsFZzK6DnP/giphy.gif",
+                            "https://media.giphy.com/media/UtXbAXl8Pt4Kr0f02Q/giphy.gif");
                     didSomeoneGotShot = true;
                 } else {
-                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                            \uD83D\uDD2B Close shot! Hunter A tried to get the bounty, but missed thier shot.
-
-                            Updated Bounty : %s""", getPrizePool()), 2);
                     addRTKToPot(transactionData.value, transactionData.fromAddress);
+                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
+                            \uD83D\uDD2B Close shot! Hunter %s tried to get the bounty, but missed their shot.
+
+                            Updated Bounty : %s""", transactionData.fromAddress, getPrizePool()), 2, "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
                 }
             }
-            last_bounty_hunter_bot.setLastCheckedTransactionDetails(lastCheckedTransactionData);
             if (didSomeoneGotShot) {
                 checkForStatus(3);
             } else {
@@ -237,7 +254,10 @@ public class Game implements Runnable {
                 quarterWarn = true;
                 boolean furtherCountNecessary = true;
                 if (msgString != null) {
-                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, msgString, 4);
+                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, msgString, 4,
+                            "https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
+                            "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
+                            "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
                 }
                 checkForStatus(4);
 
@@ -275,20 +295,23 @@ public class Game implements Runnable {
                                     break MID;
                                 } else {
                                     last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                                            💥🔫 Gotcha! Hunter %s has the bounty now. Shoot him down before he claims it.
+                                            💥🔫 Gotcha! Hunter %s has the bounty now. Shoot 'em down before they claim it.
                                             ⏱ Remaining time: LESS THAN %d minutes
-                                            💰Bounty: %s""", finalSender, currentRoundEndTime.atZone(ZoneOffset.UTC).getMinute() -
-                                            Instant.now().atZone(ZoneOffset.UTC).getMinute(), getPrizePool()), 5);
+                                            💰Bounty: %s""", finalSender, Duration.between(Instant.now(), currentRoundEndTime).toMinutes(),
+                                            getPrizePool()), 5,"https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
+                                            "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
+                                            "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
                                 }
                                 didSomeoneGotShot = true;
                             } else {
-                                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                                        🔫 Close shot! Hunter %s tried to get the bounty, but missed his shot.
-                                        The bounty will be claimed in LESS THAN %s minutes.
-                                        💰Updated bounty: %s
-                                        """, transactionData.fromAddress, currentRoundEndTime.atZone(ZoneOffset.UTC).getMinute() -
-                                        Instant.now().atZone(ZoneOffset.UTC).getMinute(), getPrizePool()), 5);
                                 addRTKToPot(transactionData.value, transactionData.fromAddress);
+                                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
+                                        🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
+                                        The bounty will be claimed in LESS THAN %s minutes.
+                                        💰Updated bounty: %s""", transactionData.fromAddress,
+                                        Duration.between(Instant.now(), currentRoundEndTime).toMinutes(),
+                                        getPrizePool()), 5,
+                                        "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
                             }
                         } else {
                             furtherCountNecessary = false;
@@ -321,11 +344,11 @@ public class Game implements Runnable {
                                 finalBurnHash = transactionData.trxHash;
                                 didSomeoneGotShot = true;
                             } else {
-                                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                                        🔫 Close shot! Hunter %s tried to get the bounty, but missed his shot.
-                                        💰Updated bounty: %s
-                                        """, transactionData.fromAddress, getPrizePool()), 5);
                                 addRTKToPot(transactionData.value, transactionData.fromAddress);
+                                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
+                                        🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
+                                        💰Updated bounty: %s""", transactionData.fromAddress, getPrizePool()), 5,
+                                        "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
                             }
                         } else {
                             transactionsUnderReview.add(0, transactionData);
@@ -338,13 +361,17 @@ public class Game implements Runnable {
                     }
                 }
             }
+
+
+
             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                     Final valid burn :-
                     Trx Hash :%s
                     Final pot holder : %s""", finalBurnHash, finalSender), 6);
             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                     “Ever notice how you come across somebody once in a while you should not have messed with? That’s me.” 
-                    %s – The Last Bounty Hunter – claimed the bounty and won %s.""", finalSender, getPrizePool()), 49);
+                    %s – The Last Bounty Hunter – claimed the bounty and won %s.""", finalSender, getPrizePool()), 49,
+                    "https://media.giphy.com/media/5obMzX3pRnSSundkPw/giphy.gif", "https://media.giphy.com/media/m3Su0jtjGHMRMnlC7L/giphy.gif");
             sendRewardToWinner(prizePool, finalSender);
 
             last_bounty_hunter_bot.setTotalRTKForPoolInWallet((netCurrentPool.multiply(BigInteger.valueOf(2))).divide(BigInteger.valueOf(5)).toString());
@@ -361,19 +388,6 @@ public class Game implements Runnable {
                         "\n\n\nThe bot will not read any transactions till the balances is updated by admins.");
                 break;
             }
-        }
-
-
-        for (int i = 0; i < 5; i++) {
-            if (!disposable[i].isDisposed()) {
-                disposable[i].dispose();
-            }
-        }
-        try {
-            web3j.shutdown();
-            webSocketService.close();
-        } catch (Exception e) {
-            e.printStackTrace();
         }
 
         getCurrentGameDeleted();
@@ -406,8 +420,34 @@ public class Game implements Runnable {
     }
 
     private void getCurrentGameDeleted() {
-        while (last_bounty_hunter_bot.deleteGame(chat_id) != 1) {
-            performProperWait(1);
+        while (!last_bounty_hunter_bot.deleteGame(chat_id)) {
+            performProperWait(1.5);
+        }
+        if(!scheduledExecutorService.isShutdown()) {
+            scheduledExecutorService.shutdownNow();
+        }
+        if (!scheduledExecutorService2.isShutdown()) {
+            scheduledExecutorService2.shutdownNow();
+        }
+        performProperWait(1);
+        for (int i = 0; i < 5; i++) {
+            try {
+                if (!disposable[i].isDisposed()) {
+                    disposable[i].dispose();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        try {
+            web3j.shutdown();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        try {
+            webSocketService.close();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -417,13 +457,14 @@ public class Game implements Runnable {
 
 
     // Related to Blockchain Communication
-    private boolean buildCustomBlockchainReader() {
+    private boolean buildCustomBlockchainReader(boolean shouldSendMessage) {
 
         int count = 0;
-        last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Connecting to Ethereum Network to read transactions. Please be patient. " +
-                "This can take from few seconds to few minutes", 1);
+        if(shouldSendMessage) {
+            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Connecting to Ethereum Network to read transactions. Please be patient. " +
+                    "This can take from few seconds to few minutes", 1);
+        }
         System.out.println("Connecting to Web3");
-        validTransactions = new ArrayList<>();
         shouldTryToEstablishConnection = true;
         while (shouldTryToEstablishConnection && count < 6) {
             count++;
@@ -434,6 +475,7 @@ public class Game implements Runnable {
                     public void onClose(int code, String reason, boolean remote) {
                         super.onClose(code, reason, remote);
                         logger.info(chat_id + " : WebSocket connection to " + uri + " closed successfully " + reason);
+                        setShouldTryToEstablishConnection();
                     }
 
                     @Override
@@ -461,7 +503,8 @@ public class Game implements Runnable {
 
             EthFilter[] RTKContractFilter = new EthFilter[5];
             for (int i = 0; i < 5; i++) {
-                RTKContractFilter[i] = new EthFilter(new DefaultBlockParameterNumber(lastCheckedTransactionData.blockNumber), DefaultBlockParameterName.LATEST, RTKContractAddresses[i]);
+                RTKContractFilter[i] = new EthFilter(new DefaultBlockParameterNumber(lastCheckedTransactionData.blockNumber),
+                        DefaultBlockParameterName.LATEST, RTKContractAddresses[i]);
                 int finalI = i;
                 disposable[i] = web3j.ethLogFlowable(RTKContractFilter[i]).subscribe(log -> {
                     String hash = log.getTransactionHash();
@@ -470,12 +513,14 @@ public class Game implements Runnable {
                         if (trx.isPresent()) {
                             TransactionData currentTrxData = splitInputData(log, trx.get());
                             currentTrxData.X = finalI + 1;
-                            System.out.println("Chat ID : " + chat_id + " - Trx :  " + log.getTransactionHash() + ", X = " + (finalI + 1) +
-                                    ", Did Burn = " + currentTrxData.didBurn);
-                            if (!currentTrxData.methodName.equals("Useless") && currentTrxData.toAddress.equalsIgnoreCase(shotWallet) && currentTrxData.value.compareTo(shotCost) >= 0) {
-                                if (currentTrxData.compareTo(lastCheckedTransactionData) > 0) {
-                                    validTransactions.add(currentTrxData);
-                                }
+                            System.out.print("Chat ID : " + chat_id + " - Trx :  " + log.getTransactionHash() + ", X = " + (finalI + 1) +
+                                    ", Did Burn = " + currentTrxData.didBurn + ", Was Counted = ");
+                            if (!currentTrxData.methodName.equals("Useless") && currentTrxData.toAddress.equalsIgnoreCase(shotWallet)
+                                    && currentTrxData.value.compareTo(shotCost) >= 0 && currentTrxData.compareTo(lastCheckedTransactionData) > 0) {
+                                validTransactions.add(currentTrxData);
+                                System.out.println("Yes");
+                            } else {
+                                System.out.println("No");
                             }
                         }
                     }
@@ -575,7 +620,7 @@ public class Game implements Runnable {
         }
     }
 
-    private void setShouldTryToEstablishConnection() {
+    public void setShouldTryToEstablishConnection() {
         shouldTryToEstablishConnection = true;
     }
 

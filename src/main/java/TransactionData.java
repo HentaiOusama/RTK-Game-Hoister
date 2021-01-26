@@ -20,14 +20,6 @@ public class TransactionData implements Comparable<TransactionData>{
         }
     }
 
-    public int compareTo(BigInteger trxIndex, BigInteger blockNumber) {
-        if(this.blockNumber.compareTo(blockNumber) != 0) {
-            return this.blockNumber.compareTo(blockNumber);
-        } else {
-            return this.trxIndex.compareTo(trxIndex);
-        }
-    }
-
     public int compareBlock(BigInteger blk) {
         return blockNumber.compareTo(blk);
     }
@@ -44,5 +36,11 @@ public class TransactionData implements Comparable<TransactionData>{
         } else {
             return false;
         }
+    }
+
+    @Override
+    public String toString() {
+        return "TrxHash : " + trxHash + ", from : " + fromAddress + ", to : " + toAddress + ", X : " + X + ", DidBurn : " + didBurn + ", Block : "
+                + blockNumber + ", TrxIndex : " + trxIndex;
     }
 }

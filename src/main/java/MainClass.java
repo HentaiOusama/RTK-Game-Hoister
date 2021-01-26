@@ -33,12 +33,7 @@ import java.math.BigInteger;
 
 public class MainClass {
 
-    // Eth Network Type = "ropsten" or "mainnet"
-    private static final String EthNetworkType = "ropsten";
     private static final String shotWallet = "0xdcCF6EE3977903d541B47F31D5bfD3AED3511C62";
-    private static final String[] RTKContractAddresses = {"0x38332D8671961aE13d0BDe040d536eB336495eEA",
-            "0x9C72573A47b0d81Ef6048c320bF5563e1606A04C", "0x136A5c9B9965F3827fbB7A9e97E41232Df168B08",
-            "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8", "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d"};
     private static final BigInteger shotCost = new BigInteger("100000000000000000000");
 
     public static void main(String[] args) {
@@ -51,7 +46,7 @@ public class MainClass {
         TelegramBotsApi telegramBotsApi = new TelegramBotsApi();
         try {
 
-            telegramBotsApi.registerBot(new Last_Bounty_Hunter_Bot(EthNetworkType, shotWallet, RTKContractAddresses, shotCost));
+            telegramBotsApi.registerBot(new Last_Bounty_Hunter_Bot(shotWallet, shotCost));
         } catch (Exception e) {
             e.printStackTrace();
         }
