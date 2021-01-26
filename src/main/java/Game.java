@@ -57,6 +57,25 @@ public class Game implements Runnable {
         @Override
         public void run() {
             if(shouldTryToEstablishConnection && transactionsUnderReview.size() == 0 && validTransactions.size() == 0 && webSocketService != null) {
+                for (int i = 0; i < 5; i++) {
+                    try {
+                        if (!disposable[i].isDisposed()) {
+                            disposable[i].dispose();
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+                try {
+                    web3j.shutdown();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                try {
+                    webSocketService.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
                 try {
                     buildCustomBlockchainReader(false);
                 } catch (Exception e) {
@@ -184,7 +203,7 @@ public class Game implements Runnable {
             }
             Collections.sort(transactionsUnderReview);
 
-            while (transactionsUnderReview.size() > 0) {
+            while (transactionsUnderReview.size() > 0 && !didSomeoneGotShot) {
                 transactionData = transactionsUnderReview.remove(0);
                 lastCheckedTransactionData = transactionData;
                 if (transactionData.didBurn) {
