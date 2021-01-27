@@ -46,7 +46,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     private String EthNetworkType;
     private final String shotWallet;
     private String[] RTKContractAddresses;
-    private final BigInteger shotCost;
+    private BigInteger shotCost;
 
     // MongoDB Related Stuff
     private final String botName = "Last Bounty Hunter Bot";
@@ -57,13 +57,12 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     // All Data Holders
     private final HashMap<Long, Game> currentlyActiveGames = new HashMap<>();
     private final LinkedBlockingDeque<TelegramMessage> allPendingMessages = new LinkedBlockingDeque<>();
-    private final ExecutorService executorService = Executors.newCachedThreadPool();
-    private final ScheduledExecutorService messageSendingExecuter = Executors.newSingleThreadScheduledExecutor();
+    private ExecutorService executorService = Executors.newCachedThreadPool();
+    private ScheduledExecutorService messageSendingExecuter = Executors.newSingleThreadScheduledExecutor();
 
 
-    Last_Bounty_Hunter_Bot(String shotWallet, BigInteger shotCost) {
+    Last_Bounty_Hunter_Bot(String shotWallet) {
         this.shotWallet = shotWallet;
-        this.shotCost = shotCost;
 
         // Mongo Stuff
         String mongoDBUri = "mongodb+srv://" + System.getenv("lastBountyHunterMonoID") + ":" +
@@ -96,6 +95,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         assert foundBotNameDoc != null;
         shouldRunGame = (boolean) foundBotNameDoc.get("shouldRunGame");
         this.EthNetworkType = (String) foundBotNameDoc.get("EthNetworkType");
+        this.shotCost = new BigInteger((String) foundBotNameDoc.get("shotCost"));
 
         if (EthNetworkType.equals("mainnet")) {
             RTKContractAddresses = new String[]{"0x1F6DEADcb526c4710Cf941872b86dcdfBbBD9211",
@@ -108,7 +108,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         }
 
         if (shouldRunGame) {
-            messageSendingExecuter.scheduleWithFixedDelay(new messageSender(), 0, 750, TimeUnit.MILLISECONDS);
+            messageSendingExecuter.scheduleWithFixedDelay(new messageSender(), 0, 800, TimeUnit.MILLISECONDS);
             if (EthNetworkType.equals("mainnet")) {
                 Game newGame = new Game(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
                 currentlyActiveGames.put(actualGameChatId, newGame);
@@ -133,15 +133,29 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                             if (EthNetworkType.equals("mainnet") && !currentlyActiveGames.containsKey(actualGameChatId)) {
                                 Game newGame = new Game(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
                                 currentlyActiveGames.put(actualGameChatId, newGame);
+                                if(!executorService.isShutdown()) {
+                                    executorService.shutdownNow();
+                                }
+                                executorService = Executors.newCachedThreadPool();
                                 executorService.execute(newGame);
                             } else if (EthNetworkType.equals("ropsten") && !currentlyActiveGames.containsKey(testingChatId)) {
                                 Game newGame = new Game(this, testingChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
                                 currentlyActiveGames.put(testingChatId, newGame);
+                                if(!executorService.isShutdown()) {
+                                    executorService.shutdownNow();
+                                }
+                                executorService = Executors.newCachedThreadPool();
                                 executorService.execute(newGame);
                             } else {
-                                throw new Exception();
+                                throw new Exception("Operation Unsuccessful. Currently a game is running. Let the game finish before starting" +
+                                        " the bot.");
                             }
-                            messageSendingExecuter.scheduleWithFixedDelay(new messageSender(), 0, 750, TimeUnit.MILLISECONDS);
+                            lastSendStatus = -1;
+                            if (!messageSendingExecuter.isShutdown()) {
+                                messageSendingExecuter.shutdownNow();
+                            }
+                            messageSendingExecuter = Executors.newSingleThreadScheduledExecutor();
+                            messageSendingExecuter.scheduleWithFixedDelay(new messageSender(), 0, 800, TimeUnit.MILLISECONDS);
                             shouldRunGame = true;
                             Document botNameDoc = new Document("botName", botName);
                             Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
@@ -151,8 +165,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                             botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
                             sendMessage(chatId, "Operation Successful");
                         } catch (Exception e) {
-                            sendMessage(chatId, "Operation Unsuccessful. Currently a game is running. Let the game finish before starting" +
-                                    " the bot.");
+                            e.printStackTrace();
+                            sendMessage(chatId, e.getMessage());
                         }
                     }
                     else if (text.equalsIgnoreCase("Switch to mainnet")) {
@@ -192,7 +206,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                         for (long key : keys) {
                             isAnyGameRunning = isAnyGameRunning || currentlyActiveGames.get(key).isGameRunning;
                         }
-                        if (!isAnyGameRunning && !shouldRunGame) {
+                        if (!isAnyGameRunning && !shouldRunGame && currentlyActiveGames.size() == 0) {
                             try {
                                 BigInteger amount = new BigInteger(text.split(" ")[1]);
                                 setTotalRTKForPoolInWallet(amount.toString());
@@ -208,13 +222,36 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     else if (text.equalsIgnoreCase("getPot")) {
                         sendMessage(chatId, getTotalRTKForPoolInWallet());
                     }
+                    else if (text.toLowerCase().startsWith("setshotcost")) {
+                        try {
+                            if(!shouldRunGame && currentlyActiveGames.size() == 0) {
+                                botNameDoc = new Document("botName", botName);
+                                foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                                assert foundBotNameDoc != null;
+                                shotCost = new BigInteger(text.trim().split(" ")[1]);
+                                Bson updatedAddyDoc = new Document("shotCost", shotCost.toString());
+                                Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
+                                botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
+                            } else {
+                                throw new Exception();
+                            }
+                        } catch (Exception e) {
+                            sendMessage(chatId, "Either the amount is invalid or there is at least one game that is still running.");
+                        }
+                    }
+                    else if (text.equalsIgnoreCase("getShotCost")) {
+                        botNameDoc = new Document("botName", botName);
+                        foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                        assert foundBotNameDoc != null;
+                        sendMessage(chatId, (String) foundBotNameDoc.get("shotCost"));
+                    }
                     else if (text.toLowerCase().startsWith("amountpulledoutfromfeesbalance")) {
                         Set<Long> keys = currentlyActiveGames.keySet();
                         boolean isAnyGameRunning = false;
                         for (long key : keys) {
                             isAnyGameRunning = isAnyGameRunning || currentlyActiveGames.get(key).isGameRunning;
                         }
-                        if (!isAnyGameRunning && !shouldRunGame) {
+                        if (!isAnyGameRunning && !shouldRunGame && currentlyActiveGames.size() == 0) {
                             try {
                                 String amount = text.split(" ")[1];
                                 if (amount.contains("-")) {
@@ -275,6 +312,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                                 ActiveProcesses
                                 setPot amount
                                 getPot
+                                setShotCost amount
+                                getShotCost
                                 amountPulledOutFromFeesBalance amount
                                 getFeesBalance
                                 rebuildAdmins
@@ -286,7 +325,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     }
 
                     else {
-                        sendMessage(update.getMessage().getChatId(), "Such command does not exists. RETARD");
+                        sendMessage(update.getMessage().getChatId(), "Such command does not exists. BaaaaaaaaaKa");
                     }
                     sendMessage(update.getMessage().getChatId(), "shouldRunGame = " + shouldRunGame + "\nEthNetworkType = "
                             + EthNetworkType + "\nRTKContractAddresses = " + Arrays.toString(RTKContractAddresses));
@@ -441,6 +480,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         if (!messageSendingExecuter.isShutdown()) {
             messageSendingExecuter.shutdownNow();
         }
+        executorService.shutdown();
         currentlyActiveGames.remove(chat_id);
         lastSendStatus = -1;
         return true;

@@ -34,7 +34,6 @@ import java.math.BigInteger;
 public class MainClass {
 
     private static final String shotWallet = "0xdcCF6EE3977903d541B47F31D5bfD3AED3511C62";
-    private static final BigInteger shotCost = new BigInteger("100000000000000000000");
 
     public static void main(String[] args) {
         BasicConfigurator.configure();
@@ -46,7 +45,7 @@ public class MainClass {
         TelegramBotsApi telegramBotsApi = new TelegramBotsApi();
         try {
 
-            telegramBotsApi.registerBot(new Last_Bounty_Hunter_Bot(shotWallet, shotCost));
+            telegramBotsApi.registerBot(new Last_Bounty_Hunter_Bot(shotWallet));
         } catch (Exception e) {
             e.printStackTrace();
         }
