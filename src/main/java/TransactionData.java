@@ -1,6 +1,6 @@
 import java.math.BigInteger;
 
-public class TransactionData implements Comparable<TransactionData>{
+public class TransactionData implements Comparable<TransactionData> {
     String trxHash;
     String methodName;
     String fromAddress;
@@ -13,7 +13,7 @@ public class TransactionData implements Comparable<TransactionData>{
 
     @Override
     public int compareTo(TransactionData o) {
-        if(blockNumber.compareTo(o.blockNumber) != 0) {
+        if (blockNumber.compareTo(o.blockNumber) != 0) {
             return blockNumber.compareTo(o.blockNumber);
         } else {
             return trxIndex.compareTo(o.trxIndex);
@@ -31,7 +31,7 @@ public class TransactionData implements Comparable<TransactionData>{
 
     @Override
     public boolean equals(Object obj) {
-        if(obj instanceof TransactionData) {
+        if (obj instanceof TransactionData) {
             return trxHash.equals(((TransactionData) obj).trxHash);
         } else {
             return false;

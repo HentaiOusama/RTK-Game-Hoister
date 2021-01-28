@@ -53,10 +53,11 @@ public class Game implements Runnable {
             }
         }
     }
+
     private class webSocketReconnect implements Runnable {
         @Override
         public void run() {
-            if(shouldTryToEstablishConnection && transactionsUnderReview.size() == 0 && validTransactions.size() == 0 && webSocketService != null) {
+            if (shouldTryToEstablishConnection && transactionsUnderReview.size() == 0 && validTransactions.size() == 0 && webSocketService != null) {
                 for (int i = 0; i < 5; i++) {
                     try {
                         if (!disposable[i].isDisposed()) {
@@ -146,14 +147,14 @@ public class Game implements Runnable {
         prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
 
         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                Welcome to the Last Bounty Hunter game.
-                Do you have what it takes to be the Last Bounty Hunter?
-                
-                Latest Prize Pool : %s
-                
-                Note :- Each shot is considered to be valid ONLY IF :-
-                1) Shot amount is at least %s RTK or RTKLX
-                2) It is sent to the below address :-""", getPrizePool(), shotCost.divide(decimals)), 0,
+                        Welcome to the Last Bounty Hunter game.
+                        Do you have what it takes to be the Last Bounty Hunter?
+                                        
+                        Latest Prize Pool : %s
+                                        
+                        Note :- Each shot is considered to be valid ONLY IF :-
+                        1) Shot amount is at least %s RTK or RTKLX
+                        2) It is sent to the below address :-""", getPrizePool(), shotCost.divide(decimals)), 0,
                 "https://media.giphy.com/media/UNBtv83uhrDrqShIhX/giphy.gif");
         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, shotWallet, 0);
 
@@ -171,11 +172,11 @@ public class Game implements Runnable {
 
         if (notHasEnoughBalance()) {
             last_bounty_hunter_bot.sendMessage(chat_id, String.format("""
-                    Rewards Wallet %s doesn't have enough eth for transactions. Please contact admins. Closing Game...
-                                                
-                    Minimum eth required : %s. Actual Balance = %s
-                                                
-                    The bot will not read any transactions till the balances is updated by admins.""", shotWallet,
+                            Rewards Wallet %s doesn't have enough eth for transactions. Please contact admins. Closing Game...
+                                                        
+                            Minimum eth required : %s. Actual Balance = %s
+                                                        
+                            The bot will not read any transactions till the balances is updated by admins.""", shotWallet,
                     new BigDecimal(minGasFees).divide(new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN), rewardWalletBalance));
             getCurrentGameDeleted();
             return;
@@ -186,6 +187,7 @@ public class Game implements Runnable {
         checkForStatus(1);
         last_bounty_hunter_bot.sendMessage(chat_id, "Connection Successful... Keep Shooting....");
         performProperWait(1.5);
+
 
         String finalBurnHash = null;
         try {
@@ -211,19 +213,19 @@ public class Game implements Runnable {
                         finalSender = transactionData.fromAddress;
                         finalBurnHash = transactionData.trxHash;
                         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                            💥🔫 First blood!!!
-                            Hunter %s has the bounty. Shoot him down before he claims it.
-                            ⏱ Time limit: 30 minutes
-                            💰Bounty: %s""", finalSender, getPrizePool()), 3,
+                                        💥🔫 First blood!!!
+                                        Hunter %s has the bounty. Shoot him down before he claims it.
+                                        ⏱ Time limit: 30 minutes
+                                        💰Bounty: %s""", finalSender, getPrizePool()), 3,
                                 "https://media.giphy.com/media/xaMURZrCVsFZzK6DnP/giphy.gif",
                                 "https://media.giphy.com/media/UtXbAXl8Pt4Kr0f02Q/giphy.gif");
                         didSomeoneGotShot = true;
                     } else {
                         addRTKToPot(transactionData.value, transactionData.fromAddress);
                         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                            \uD83D\uDD2B Close shot! Hunter %s tried to get the bounty, but missed their shot.
+                                \uD83D\uDD2B Close shot! Hunter %s tried to get the bounty, but missed their shot.
 
-                            Updated Bounty : %s""", transactionData.fromAddress, getPrizePool()), 2, "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
+                                Updated Bounty : %s""", transactionData.fromAddress, getPrizePool()), 2, "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
                     }
                 }
                 if (didSomeoneGotShot) {
@@ -254,10 +256,10 @@ public class Game implements Runnable {
                         halfValue = 10;
                         quarterValue = 5;
                         msgString = String.format("""
-                            💥🔫 Gotcha! Round 2 started
-                            Hunter %s has the bounty now. Shoot him down before he claims it.
-                            ⏱ Time limit: 20 minutes
-                            💰Bounty: %s""", finalSender, getPrizePool());
+                                💥🔫 Gotcha! Round 2 started
+                                Hunter %s has the bounty now. Shoot him down before he claims it.
+                                ⏱ Time limit: 20 minutes
+                                💰Bounty: %s""", finalSender, getPrizePool());
                     } else {
                         currentRoundHalfTime = currentRoundStartTime.plus(5, ChronoUnit.MINUTES);
                         currentRoundQuarterTime = currentRoundHalfTime.plus(7, ChronoUnit.MINUTES);
@@ -265,10 +267,10 @@ public class Game implements Runnable {
                         halfValue = 5;
                         quarterValue = 3;
                         msgString = String.format("""
-                            💥🔫 Gotcha! Round 3 started
-                            Hunter %s has the bounty now. Shoot him down before he claims it.
-                            ⏱ Time limit: 10 minutes
-                            💰Bounty: %s""", finalSender, getPrizePool());
+                                💥🔫 Gotcha! Round 3 started
+                                Hunter %s has the bounty now. Shoot him down before he claims it.
+                                ⏱ Time limit: 10 minutes
+                                💰Bounty: %s""", finalSender, getPrizePool());
                     }
                     halfWarn = true;
                     quarterWarn = true;
@@ -315,10 +317,10 @@ public class Game implements Runnable {
                                         break MID;
                                     } else {
                                         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                                            💥🔫 Gotcha! Hunter %s has the bounty now. Shoot 'em down before they claim it.
-                                            ⏱ Remaining time: LESS THAN %d minutes
-                                            💰Bounty: %s""", finalSender, Duration.between(Instant.now(), currentRoundEndTime).toMinutes(),
-                                                getPrizePool()), 5,"https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
+                                                        💥🔫 Gotcha! Hunter %s has the bounty now. Shoot 'em down before they claim it.
+                                                        ⏱ Remaining time: LESS THAN %d minutes
+                                                        💰Bounty: %s""", finalSender, Duration.between(Instant.now(), currentRoundEndTime).toMinutes(),
+                                                getPrizePool()), 5, "https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
                                                 "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
                                                 "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
                                     }
@@ -326,9 +328,9 @@ public class Game implements Runnable {
                                 } else {
                                     addRTKToPot(transactionData.value, transactionData.fromAddress);
                                     last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                                        🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
-                                        The bounty will be claimed in LESS THAN %s minutes.
-                                        💰Updated bounty: %s""", transactionData.fromAddress,
+                                                    🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
+                                                    The bounty will be claimed in LESS THAN %s minutes.
+                                                    💰Updated bounty: %s""", transactionData.fromAddress,
                                             Duration.between(Instant.now(), currentRoundEndTime).toMinutes(),
                                             getPrizePool()), 5,
                                             "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
@@ -347,7 +349,8 @@ public class Game implements Runnable {
                     }
 
                     if (furtherCountNecessary) {
-                        last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "All rounds have ended. Checking for final desperate " +
+                        String midMsg = (roundCount == 3) ? "All rounds have ended. " : "";
+                        last_bounty_hunter_bot.enqueueMessageForSend(chat_id, midMsg + "Checking for final desperate " +
                                 "attempts of hunters...(Don't try to hunt now. Results are already set in stone)", 5);
                         didSomeoneGotShot = false;
                         while (!validTransactions.isEmpty()) {
@@ -366,8 +369,8 @@ public class Game implements Runnable {
                                 } else {
                                     addRTKToPot(transactionData.value, transactionData.fromAddress);
                                     last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                                        🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
-                                        💰Updated bounty: %s""", transactionData.fromAddress, getPrizePool()), 5,
+                                                    🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
+                                                    💰Updated bounty: %s""", transactionData.fromAddress, getPrizePool()), 5,
                                             "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
                                 }
                             } else {
@@ -375,22 +378,20 @@ public class Game implements Runnable {
                                 break;
                             }
                         }
-                        if (didSomeoneGotShot) {
-
-                            performProperWait(1);
+                        if (!didSomeoneGotShot) {
+                            break;
                         }
                     }
                 }
 
 
-
                 last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                    Final valid burn :-
-                    Trx Hash :%s
-                    Final pot holder : %s""", finalBurnHash, finalSender), 6);
+                        Final valid burn :-
+                        Trx Hash :%s
+                        Final pot holder : %s""", finalBurnHash, finalSender), 6);
                 last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                    “Ever notice how you come across somebody once in a while you should not have messed with? That’s me.” 
-                    %s – The Last Bounty Hunter – claimed the bounty and won %s.""", finalSender, getPrizePool()), 49,
+                                “Ever notice how you come across somebody once in a while you should not have messed with? That’s me.” 
+                                %s – The Last Bounty Hunter – claimed the bounty and won %s.""", finalSender, getPrizePool()), 49,
                         "https://media.giphy.com/media/5obMzX3pRnSSundkPw/giphy.gif", "https://media.giphy.com/media/m3Su0jtjGHMRMnlC7L/giphy.gif");
                 sendRewardToWinner(prizePool, finalSender);
 
@@ -414,6 +415,7 @@ public class Game implements Runnable {
             last_bounty_hunter_bot.sendMessage(chat_id, "The bot encountered Fatal Error.\nReference : " + e.getMessage() +
                     "\n\nPlease Contact @OreGaZembuTouchiSuru");
         }
+
 
         getCurrentGameDeleted();
     }
@@ -448,7 +450,7 @@ public class Game implements Runnable {
         while (!last_bounty_hunter_bot.deleteGame(chat_id, this)) {
             performProperWait(1.5);
         }
-        if(!scheduledExecutorService.isShutdown()) {
+        if (!scheduledExecutorService.isShutdown()) {
             scheduledExecutorService.shutdownNow();
         }
         if (!scheduledExecutorService2.isShutdown()) {
@@ -488,7 +490,7 @@ public class Game implements Runnable {
     private boolean buildCustomBlockchainReader(boolean shouldSendMessage) {
 
         int count = 0;
-        if(shouldSendMessage) {
+        if (shouldSendMessage) {
             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Connecting to Ethereum Network to read transactions. Please be patient. " +
                     "This can take from few seconds to few minutes", 1);
         }
