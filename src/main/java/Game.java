@@ -90,7 +90,7 @@ public class Game implements Runnable {
     Logger logger = Logger.getLogger(Game.class);
     private final Last_Bounty_Hunter_Bot last_bounty_hunter_bot;
     private final long chat_id;
-    public volatile boolean isGameRunning = false, shouldContinueGame = true, didSomeoneGotShot = false;
+    public volatile boolean isGameRunning = false, shouldContinueGame = true, didSomeoneGotShot = false, hasGameClosed = false;
     private volatile Instant currentRoundEndTime;
     private volatile BigInteger finalLatestBlockNumber = null;
     private volatile TransactionData lastCheckedTransactionData = null;
@@ -188,225 +188,231 @@ public class Game implements Runnable {
         performProperWait(1.5);
 
         String finalBurnHash = null;
-        while (shouldContinueGame) {
+        try {
+            while (shouldContinueGame) {
 
-            if (validTransactions.size() == 0 && transactionsUnderReview.size() == 0) {
-                performProperWait(2);
-                continue;
-            }
+                if (validTransactions.size() == 0 && transactionsUnderReview.size() == 0) {
+                    performProperWait(2);
+                    continue;
+                }
 
-            // Check for initial Burned Transaction to start the game.
-            didSomeoneGotShot = false;
-            TransactionData transactionData;
-            while (!validTransactions.isEmpty()) {
-                transactionsUnderReview.add(validTransactions.remove(0));
-            }
-            Collections.sort(transactionsUnderReview);
+                // Check for initial Burned Transaction to start the game.
+                didSomeoneGotShot = false;
+                TransactionData transactionData;
+                while (!validTransactions.isEmpty()) {
+                    transactionsUnderReview.add(validTransactions.remove(0));
+                }
+                Collections.sort(transactionsUnderReview);
 
-            while (transactionsUnderReview.size() > 0 && !didSomeoneGotShot) {
-                transactionData = transactionsUnderReview.remove(0);
-                lastCheckedTransactionData = transactionData;
-                if (transactionData.didBurn) {
-                    finalSender = transactionData.fromAddress;
-                    finalBurnHash = transactionData.trxHash;
-                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
+                while (transactionsUnderReview.size() > 0 && !didSomeoneGotShot) {
+                    transactionData = transactionsUnderReview.remove(0);
+                    lastCheckedTransactionData = transactionData;
+                    if (transactionData.didBurn) {
+                        finalSender = transactionData.fromAddress;
+                        finalBurnHash = transactionData.trxHash;
+                        last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                             💥🔫 First blood!!!
                             Hunter %s has the bounty. Shoot him down before he claims it.
                             ⏱ Time limit: 30 minutes
                             💰Bounty: %s""", finalSender, getPrizePool()), 3,
-                            "https://media.giphy.com/media/xaMURZrCVsFZzK6DnP/giphy.gif",
-                            "https://media.giphy.com/media/UtXbAXl8Pt4Kr0f02Q/giphy.gif");
-                    didSomeoneGotShot = true;
-                } else {
-                    addRTKToPot(transactionData.value, transactionData.fromAddress);
-                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
+                                "https://media.giphy.com/media/xaMURZrCVsFZzK6DnP/giphy.gif",
+                                "https://media.giphy.com/media/UtXbAXl8Pt4Kr0f02Q/giphy.gif");
+                        didSomeoneGotShot = true;
+                    } else {
+                        addRTKToPot(transactionData.value, transactionData.fromAddress);
+                        last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                             \uD83D\uDD2B Close shot! Hunter %s tried to get the bounty, but missed their shot.
 
                             Updated Bounty : %s""", transactionData.fromAddress, getPrizePool()), 2, "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
+                    }
                 }
-            }
-            if (didSomeoneGotShot) {
-                checkForStatus(3);
-            } else {
-                continue;
-            }
+                if (didSomeoneGotShot) {
+                    checkForStatus(3);
+                } else {
+                    continue;
+                }
 
 
-            isGameRunning = true;
-            for (int roundCount = 1; roundCount <= 3; roundCount++) {
-                didSomeoneGotShot = false;
-                Instant currentRoundHalfTime, currentRoundQuarterTime;
-                Instant currentRoundStartTime = Instant.now();
-                String msgString;
-                if (roundCount == 1) {
-                    currentRoundHalfTime = currentRoundStartTime.plus(15, ChronoUnit.MINUTES);
-                    currentRoundQuarterTime = currentRoundHalfTime.plus(22, ChronoUnit.MINUTES);
-                    currentRoundEndTime = currentRoundStartTime.plus(30, ChronoUnit.MINUTES);
-                    halfValue = 15;
-                    quarterValue = 8;
-                    msgString = null;
-                    last_bounty_hunter_bot.lastSendStatus = 4;
-                } else if (roundCount == 2) {
-                    currentRoundHalfTime = currentRoundStartTime.plus(10, ChronoUnit.MINUTES);
-                    currentRoundQuarterTime = currentRoundHalfTime.plus(15, ChronoUnit.MINUTES);
-                    currentRoundEndTime = currentRoundStartTime.plus(20, ChronoUnit.MINUTES);
-                    halfValue = 10;
-                    quarterValue = 5;
-                    msgString = String.format("""
+                isGameRunning = true;
+                for (int roundCount = 1; roundCount <= 3; roundCount++) {
+                    didSomeoneGotShot = false;
+                    Instant currentRoundHalfTime, currentRoundQuarterTime;
+                    Instant currentRoundStartTime = Instant.now();
+                    String msgString;
+                    if (roundCount == 1) {
+                        currentRoundHalfTime = currentRoundStartTime.plus(15, ChronoUnit.MINUTES);
+                        currentRoundQuarterTime = currentRoundHalfTime.plus(22, ChronoUnit.MINUTES);
+                        currentRoundEndTime = currentRoundStartTime.plus(30, ChronoUnit.MINUTES);
+                        halfValue = 15;
+                        quarterValue = 8;
+                        msgString = null;
+                        last_bounty_hunter_bot.lastSendStatus = 4;
+                    } else if (roundCount == 2) {
+                        currentRoundHalfTime = currentRoundStartTime.plus(10, ChronoUnit.MINUTES);
+                        currentRoundQuarterTime = currentRoundHalfTime.plus(15, ChronoUnit.MINUTES);
+                        currentRoundEndTime = currentRoundStartTime.plus(20, ChronoUnit.MINUTES);
+                        halfValue = 10;
+                        quarterValue = 5;
+                        msgString = String.format("""
                             💥🔫 Gotcha! Round 2 started
                             Hunter %s has the bounty now. Shoot him down before he claims it.
                             ⏱ Time limit: 20 minutes
                             💰Bounty: %s""", finalSender, getPrizePool());
-                } else {
-                    currentRoundHalfTime = currentRoundStartTime.plus(5, ChronoUnit.MINUTES);
-                    currentRoundQuarterTime = currentRoundHalfTime.plus(7, ChronoUnit.MINUTES);
-                    currentRoundEndTime = currentRoundStartTime.plus(10, ChronoUnit.MINUTES);
-                    halfValue = 5;
-                    quarterValue = 3;
-                    msgString = String.format("""
+                    } else {
+                        currentRoundHalfTime = currentRoundStartTime.plus(5, ChronoUnit.MINUTES);
+                        currentRoundQuarterTime = currentRoundHalfTime.plus(7, ChronoUnit.MINUTES);
+                        currentRoundEndTime = currentRoundStartTime.plus(10, ChronoUnit.MINUTES);
+                        halfValue = 5;
+                        quarterValue = 3;
+                        msgString = String.format("""
                             💥🔫 Gotcha! Round 3 started
                             Hunter %s has the bounty now. Shoot him down before he claims it.
                             ⏱ Time limit: 10 minutes
                             💰Bounty: %s""", finalSender, getPrizePool());
-                }
-                halfWarn = true;
-                quarterWarn = true;
-                boolean furtherCountNecessary = true;
-                if (msgString != null) {
-                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, msgString, 4,
-                            "https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
-                            "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
-                            "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
-                }
-                checkForStatus(4);
-
-
-                MID:
-                while (Instant.now().compareTo(currentRoundEndTime) <= 0) {
-                    if (halfWarn) {
-                        if (Instant.now().compareTo(currentRoundHalfTime) >= 0) {
-                            last_bounty_hunter_bot.sendMessage(chat_id, "Hurry up! Half Time crossed. LESS THAN " + halfValue + " minutes " +
-                                    "remaining for the current round. Shoot hunter " + finalSender + " down before he claims the bounty!");
-                            halfWarn = false;
-                        }
-                    } else if (quarterWarn) {
-                        if (Instant.now().compareTo(currentRoundQuarterTime) >= 0) {
-                            last_bounty_hunter_bot.sendMessage(chat_id, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue + " minutes " +
-                                    "remaining for the current round. Shoot hunter " + finalSender + " down before he claims the bounty!");
-                            quarterWarn = false;
-                        }
                     }
-
-                    while (!validTransactions.isEmpty()) {
-                        transactionsUnderReview.add(validTransactions.remove(0));
+                    halfWarn = true;
+                    quarterWarn = true;
+                    boolean furtherCountNecessary = true;
+                    if (msgString != null) {
+                        last_bounty_hunter_bot.enqueueMessageForSend(chat_id, msgString, 4,
+                                "https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
+                                "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
+                                "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
                     }
-                    Collections.sort(transactionsUnderReview);
+                    checkForStatus(4);
 
-                    while (transactionsUnderReview.size() > 0) {
-                        transactionData = transactionsUnderReview.remove(0);
-                        lastCheckedTransactionData = transactionData;
-                        if (finalLatestBlockNumber == null || transactionData.compareBlock(finalLatestBlockNumber) <= 0) {
-                            if (transactionData.didBurn) {
-                                finalSender = transactionData.fromAddress;
-                                finalBurnHash = transactionData.trxHash;
-                                if (roundCount != 3) {
-                                    furtherCountNecessary = false;
-                                    break MID;
-                                } else {
-                                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
+
+                    MID:
+                    while (Instant.now().compareTo(currentRoundEndTime) <= 0) {
+                        if (halfWarn) {
+                            if (Instant.now().compareTo(currentRoundHalfTime) >= 0) {
+                                last_bounty_hunter_bot.sendMessage(chat_id, "Hurry up! Half Time crossed. LESS THAN " + halfValue + " minutes " +
+                                        "remaining for the current round. Shoot hunter " + finalSender + " down before he claims the bounty!");
+                                halfWarn = false;
+                            }
+                        } else if (quarterWarn) {
+                            if (Instant.now().compareTo(currentRoundQuarterTime) >= 0) {
+                                last_bounty_hunter_bot.sendMessage(chat_id, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue + " minutes " +
+                                        "remaining for the current round. Shoot hunter " + finalSender + " down before he claims the bounty!");
+                                quarterWarn = false;
+                            }
+                        }
+
+                        while (!validTransactions.isEmpty()) {
+                            transactionsUnderReview.add(validTransactions.remove(0));
+                        }
+                        Collections.sort(transactionsUnderReview);
+
+                        while (transactionsUnderReview.size() > 0) {
+                            transactionData = transactionsUnderReview.remove(0);
+                            lastCheckedTransactionData = transactionData;
+                            if (finalLatestBlockNumber == null || transactionData.compareBlock(finalLatestBlockNumber) <= 0) {
+                                if (transactionData.didBurn) {
+                                    finalSender = transactionData.fromAddress;
+                                    finalBurnHash = transactionData.trxHash;
+                                    if (roundCount != 3) {
+                                        furtherCountNecessary = false;
+                                        break MID;
+                                    } else {
+                                        last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                                             💥🔫 Gotcha! Hunter %s has the bounty now. Shoot 'em down before they claim it.
                                             ⏱ Remaining time: LESS THAN %d minutes
                                             💰Bounty: %s""", finalSender, Duration.between(Instant.now(), currentRoundEndTime).toMinutes(),
-                                            getPrizePool()), 5,"https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
-                                            "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
-                                            "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
-                                }
-                                didSomeoneGotShot = true;
-                            } else {
-                                addRTKToPot(transactionData.value, transactionData.fromAddress);
-                                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
+                                                getPrizePool()), 5,"https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
+                                                "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
+                                                "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
+                                    }
+                                    didSomeoneGotShot = true;
+                                } else {
+                                    addRTKToPot(transactionData.value, transactionData.fromAddress);
+                                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                                         🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
                                         The bounty will be claimed in LESS THAN %s minutes.
                                         💰Updated bounty: %s""", transactionData.fromAddress,
-                                        Duration.between(Instant.now(), currentRoundEndTime).toMinutes(),
-                                        getPrizePool()), 5,
-                                        "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
-                            }
-                        } else {
-                            furtherCountNecessary = false;
-                            transactionsUnderReview.add(0, transactionData);
-                            break MID;
-                        }
-                    }
-                    performProperWait(0.7);
-                }
-
-                if (!scheduledExecutorService.isShutdown()) {
-                    scheduledExecutorService.shutdownNow();
-                }
-
-                if (furtherCountNecessary) {
-                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "All rounds have ended. Checking for final desperate " +
-                            "attempts of hunters...(Don't try to hunt now. Results are already set in stone)", 5);
-                    didSomeoneGotShot = false;
-                    while (!validTransactions.isEmpty()) {
-                        transactionsUnderReview.add(validTransactions.remove(0));
-                    }
-                    Collections.sort(transactionsUnderReview);
-
-                    while (transactionsUnderReview.size() > 0) {
-                        transactionData = transactionsUnderReview.remove(0);
-                        lastCheckedTransactionData = transactionData;
-                        if (finalLatestBlockNumber == null || transactionData.compareBlock(finalLatestBlockNumber) <= 0) {
-                            if (transactionData.didBurn) {
-                                finalSender = transactionData.fromAddress;
-                                finalBurnHash = transactionData.trxHash;
-                                didSomeoneGotShot = true;
+                                            Duration.between(Instant.now(), currentRoundEndTime).toMinutes(),
+                                            getPrizePool()), 5,
+                                            "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
+                                }
                             } else {
-                                addRTKToPot(transactionData.value, transactionData.fromAddress);
-                                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
+                                furtherCountNecessary = false;
+                                transactionsUnderReview.add(0, transactionData);
+                                break MID;
+                            }
+                        }
+                        performProperWait(0.7);
+                    }
+
+                    if (!scheduledExecutorService.isShutdown()) {
+                        scheduledExecutorService.shutdownNow();
+                    }
+
+                    if (furtherCountNecessary) {
+                        last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "All rounds have ended. Checking for final desperate " +
+                                "attempts of hunters...(Don't try to hunt now. Results are already set in stone)", 5);
+                        didSomeoneGotShot = false;
+                        while (!validTransactions.isEmpty()) {
+                            transactionsUnderReview.add(validTransactions.remove(0));
+                        }
+                        Collections.sort(transactionsUnderReview);
+
+                        while (transactionsUnderReview.size() > 0) {
+                            transactionData = transactionsUnderReview.remove(0);
+                            lastCheckedTransactionData = transactionData;
+                            if (finalLatestBlockNumber == null || transactionData.compareBlock(finalLatestBlockNumber) <= 0) {
+                                if (transactionData.didBurn) {
+                                    finalSender = transactionData.fromAddress;
+                                    finalBurnHash = transactionData.trxHash;
+                                    didSomeoneGotShot = true;
+                                } else {
+                                    addRTKToPot(transactionData.value, transactionData.fromAddress);
+                                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                                         🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
                                         💰Updated bounty: %s""", transactionData.fromAddress, getPrizePool()), 5,
-                                        "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
+                                            "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
+                                }
+                            } else {
+                                transactionsUnderReview.add(0, transactionData);
+                                break;
                             }
-                        } else {
-                            transactionsUnderReview.add(0, transactionData);
-                            break;
+                        }
+                        if (didSomeoneGotShot) {
+
+                            performProperWait(1);
                         }
                     }
-                    if (didSomeoneGotShot) {
-
-                        performProperWait(1);
-                    }
                 }
-            }
 
 
 
-            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
+                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                     Final valid burn :-
                     Trx Hash :%s
                     Final pot holder : %s""", finalBurnHash, finalSender), 6);
-            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
+                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                     “Ever notice how you come across somebody once in a while you should not have messed with? That’s me.” 
                     %s – The Last Bounty Hunter – claimed the bounty and won %s.""", finalSender, getPrizePool()), 49,
-                    "https://media.giphy.com/media/5obMzX3pRnSSundkPw/giphy.gif", "https://media.giphy.com/media/m3Su0jtjGHMRMnlC7L/giphy.gif");
-            sendRewardToWinner(prizePool, finalSender);
+                        "https://media.giphy.com/media/5obMzX3pRnSSundkPw/giphy.gif", "https://media.giphy.com/media/m3Su0jtjGHMRMnlC7L/giphy.gif");
+                sendRewardToWinner(prizePool, finalSender);
 
-            last_bounty_hunter_bot.setTotalRTKForPoolInWallet((netCurrentPool.multiply(BigInteger.valueOf(2))).divide(BigInteger.valueOf(5)).toString());
-            last_bounty_hunter_bot.addAmountToWalletFeesBalance(netCurrentPool.divide(BigInteger.valueOf(10)).toString());
-            last_bounty_hunter_bot.setLastCheckedTransactionDetails(lastCheckedTransactionData);
-            isGameRunning = false;
+                last_bounty_hunter_bot.setTotalRTKForPoolInWallet((netCurrentPool.multiply(BigInteger.valueOf(2))).divide(BigInteger.valueOf(5)).toString());
+                last_bounty_hunter_bot.addAmountToWalletFeesBalance(netCurrentPool.divide(BigInteger.valueOf(10)).toString());
+                last_bounty_hunter_bot.setLastCheckedTransactionDetails(lastCheckedTransactionData);
+                isGameRunning = false;
 
-            checkForStatus(50);
-            last_bounty_hunter_bot.lastSendStatus = 1;
-            if (notHasEnoughBalance()) {
-                last_bounty_hunter_bot.sendMessage(chat_id, "Rewards Wallet " + shotWallet + " doesn't have enough eth for transactions. " +
-                        "Please contact admins. Closing Game\n\nMinimum eth required : " + new BigDecimal(minGasFees).divide(
-                        new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN) + ". Actual Balance = " + rewardWalletBalance +
-                        "\n\n\nThe bot will not read any transactions till the balances is updated by admins.");
-                break;
+                checkForStatus(50);
+                last_bounty_hunter_bot.lastSendStatus = 1;
+                if (notHasEnoughBalance()) {
+                    last_bounty_hunter_bot.sendMessage(chat_id, "Rewards Wallet " + shotWallet + " doesn't have enough eth for transactions. " +
+                            "Please contact admins. Closing Game\n\nMinimum eth required : " + new BigDecimal(minGasFees).divide(
+                            new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN) + ". Actual Balance = " + rewardWalletBalance +
+                            "\n\n\nThe bot will not read any transactions till the balances is updated by admins.");
+                    break;
+                }
             }
+        } catch (Exception e) {
+            e.printStackTrace();
+            last_bounty_hunter_bot.sendMessage(chat_id, "The bot encountered Fatal Error.\nReference : " + e.getMessage() +
+                    "\n\nPlease Contact @OreGaZembuTouchiSuru");
         }
 
         getCurrentGameDeleted();
@@ -439,7 +445,7 @@ public class Game implements Runnable {
     }
 
     private void getCurrentGameDeleted() {
-        while (!last_bounty_hunter_bot.deleteGame(chat_id)) {
+        while (!last_bounty_hunter_bot.deleteGame(chat_id, this)) {
             performProperWait(1.5);
         }
         if(!scheduledExecutorService.isShutdown()) {
@@ -468,6 +474,9 @@ public class Game implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        hasGameClosed = true;
+        last_bounty_hunter_bot.sendMessage(chat_id, "The bot has been shut down. Please don't send any transactions now.");
+        System.out.println("Game Closed...");
     }
 
     public void setShouldContinueGame(boolean shouldContinueGame) {

@@ -197,8 +197,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                                 count++;
                             }
                         }
-                        sendMessage(chatId, "Chats with Active Games : " + currentlyActiveGames.size() +
-                                "\n\nChats with ongoing Round = " + count);
+                        sendMessage(chatId, "Chats with Active Games  :  " + currentlyActiveGames.size() +
+                                "\n\nChats with ongoing Round  :  " + count);
                     }
                     else if (text.toLowerCase().startsWith("setpot")) {
                         Set<Long> keys = currentlyActiveGames.keySet();
@@ -473,14 +473,28 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         }
     }
 
-    public boolean deleteGame(long chat_id) {
+    public boolean deleteGame(long chat_id, Game game) {
         if (allPendingMessages.size() != 0) {
             return false;
         }
         if (!messageSendingExecuter.isShutdown()) {
             messageSendingExecuter.shutdownNow();
         }
-        executorService.shutdown();
+        new Thread() {
+            @Override
+            public void run() {
+                super.run();
+                while(!game.hasGameClosed) {
+                    try {
+                        sleep(1000);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+                executorService.shutdown();
+                System.out.println("Game end successful.");
+            }
+        }.start();
         currentlyActiveGames.remove(chat_id);
         lastSendStatus = -1;
         return true;
@@ -511,7 +525,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         assert foundWalletDetailDoc != null;
         BigInteger balance = new BigInteger((String) foundWalletDetailDoc.get("balanceCollectedAsFees"));
         balance = balance.add(new BigInteger(amount));
-        Bson updateWalletDoc = new Document("balanceCollectedAsFees", balance);
+        Bson updateWalletDoc = new Document("balanceCollectedAsFees", balance.toString());
         Bson updateWalletDocOperation = new Document("$set", updateWalletDoc);
         walletDistributionCollection.updateOne(foundWalletDetailDoc, updateWalletDocOperation);
     }
