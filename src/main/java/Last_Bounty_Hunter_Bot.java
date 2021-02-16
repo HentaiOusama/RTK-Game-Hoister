@@ -11,6 +11,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendAnimation;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
+import java.io.*;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.*;
@@ -23,12 +24,35 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         public void run() {
             try {
                 TelegramMessage currentMessage = allPendingMessages.take();
+                lastSendStatus = currentMessage.sendStatus;
+                if(makeChecks) {
+                    boolean shouldReturn = true;
+                    if(currentMessage.hasTransactionData) {
+                        if(lastSavedStateTransactionData != null) {
+                            makeChecks = currentMessage.transactionData.compareTo(lastSavedStateTransactionData) < 0;
+                        } else {
+                            shouldReturn = false;
+                            makeChecks = false;
+                        }
+                        if(!makeChecks) {
+                            Set<Long> keys = currentlyActiveGames.keySet();
+                            for(long key : keys) {
+                                currentlyActiveGames.get(key).shouldRecoverFromAbruptInterruption = false;
+                            }
+                        }
+                    }
+                    if(shouldReturn) {
+                        return;
+                    }
+                }
                 if ((currentMessage.isMessage)) {
                     execute(currentMessage.sendMessage);
                 } else {
                     execute(currentMessage.sendAnimation);
                 }
-                lastSendStatus = currentMessage.sendStatus;
+                if(currentMessage.hasTransactionData) {
+                    lastSavedStateTransactionData = currentMessage.transactionData;
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -40,6 +64,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     private ArrayList<Long> allAdmins = new ArrayList<>();
     public volatile String topUpWalletAddress;
     private final long testingChatId = -1001477389485L, actualGameChatId = -1001275436629L;
+    public volatile boolean makeChecks = false;
+    public volatile TransactionData lastSavedStateTransactionData = null;
     public volatile int lastSendStatus = -1;
 
     // Blockchain Related Stuff
@@ -52,7 +78,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     private final String botName = "Last Bounty Hunter Bot";
     private final ClientSession clientSession;
     private final MongoCollection botControlCollection, walletDistributionCollection;
-    private Document botNameDoc, foundBotNameDoc, walletDetailDoc, foundWalletDetailDoc;
 
     // All Data Holders
     private final HashMap<Long, Game> currentlyActiveGames = new HashMap<>();
@@ -64,20 +89,50 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     Last_Bounty_Hunter_Bot(String shotWallet) {
         this.shotWallet = shotWallet;
 
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            @Override
+            public void run() {
+                super.run();
+                System.out.println("\n...Shutdown Handler Called...\n...Initiating Graceful Shutdown...\n");
+                executorService.shutdownNow();
+                messageSendingExecuter.shutdownNow();
+                Set<Long> keys = currentlyActiveGames.keySet();
+                for(long key : keys) {
+                    Game game = currentlyActiveGames.get(key);
+                    try {
+                        System.out.println("Checking File Path : " + new File(".").getCanonicalPath());
+                        System.out.println("Does basic file exist : " + new File("./PreservedState.bps").exists());
+                        FileOutputStream fileOutputStream = new FileOutputStream("./PreservedState.bps");
+                        ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
+                        LastGameState lastGameState = new LastGameState(lastSavedStateTransactionData, game.getCurrentRoundEndTime());
+                        System.out.println("\nSaved Game State :-\nTrxData --> " + ((lastSavedStateTransactionData == null) ?
+                                "null" : lastSavedStateTransactionData.toString()) + "\nEndTime --> " + ((lastGameState.lastGameEndTime == null) ?
+                                "null" : lastGameState.lastGameEndTime.toString()));
+                        objectOutputStream.writeObject(lastGameState);
+                        objectOutputStream.close();
+                        fileOutputStream.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+                System.out.println("\n...Graceful Shutddown Successful...\n");
+            }
+        });
+
         // Mongo Stuff
-        String mongoDBUri = "mongodb+srv://" + System.getenv("lastBountyHunterMonoID") + ":" +
-                System.getenv("lastBountyHunterMonoPass") + "@hellgatesbotcluster.zm0r5.mongodb.net/test";
-        ConnectionString connectionString = new ConnectionString(mongoDBUri);
+        ConnectionString connectionString = new ConnectionString(
+                "mongodb+srv://" + System.getenv("lastBountyHunterMonoID") + ":" +
+                System.getenv("lastBountyHunterMonoPass") + "@hellgatesbotcluster.zm0r5.mongodb.net/test"
+        );
         MongoClientSettings mongoClientSettings = MongoClientSettings.builder()
                 .applyConnectionString(connectionString).retryWrites(true).build();
         MongoClient mongoClient = MongoClients.create(mongoClientSettings);
         clientSession = mongoClient.startSession();
-        String botControlDatabaseName = "All-Bots-Command-Centre";
-        botControlCollection = mongoClient.getDatabase(botControlDatabaseName).getCollection("MemberValues");
+        botControlCollection = mongoClient.getDatabase("All-Bots-Command-Centre").getCollection("MemberValues");
         walletDistributionCollection = mongoClient.getDatabase("Last-Bounty-Hunter-Bot-Database").getCollection("ManagingData");
 
-        walletDetailDoc = new Document("identifier", "adminDetails");
-        foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+        Document walletDetailDoc = new Document("identifier", "adminDetails");
+        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         assert foundWalletDetailDoc != null;
         topUpWalletAddress = (String) foundWalletDetailDoc.get("topUpWalletAddress");
         if (foundWalletDetailDoc.get("adminID") instanceof List) {
@@ -90,8 +145,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         }
         System.out.println("TopUpWalletAddress = " + topUpWalletAddress + "\nAdmins = " + allAdmins);
 
-        botNameDoc = new Document("botName", botName);
-        foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+        Document botNameDoc = new Document("botName", botName);
+        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
         assert foundBotNameDoc != null;
         shouldRunGame = (boolean) foundBotNameDoc.get("shouldRunGame");
         this.EthNetworkType = (String) foundBotNameDoc.get("EthNetworkType");
@@ -225,8 +280,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     else if (text.toLowerCase().startsWith("setshotcost")) {
                         try {
                             if (!shouldRunGame && currentlyActiveGames.size() == 0) {
-                                botNameDoc = new Document("botName", botName);
-                                foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                                Document botNameDoc = new Document("botName", botName);
+                                Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
                                 assert foundBotNameDoc != null;
                                 shotCost = new BigInteger(text.trim().split(" ")[1]);
                                 Bson updatedAddyDoc = new Document("shotCost", shotCost.toString());
@@ -240,8 +295,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                         }
                     }
                     else if (text.equalsIgnoreCase("getShotCost")) {
-                        botNameDoc = new Document("botName", botName);
-                        foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                        Document botNameDoc = new Document("botName", botName);
+                        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
                         assert foundBotNameDoc != null;
                         sendMessage(chatId, (String) foundBotNameDoc.get("shotCost"));
                     }
@@ -408,10 +463,11 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                             "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8", "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d"};
                 }
 
-                botNameDoc = new Document("botName", botName);
-                foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                Document botNameDoc = new Document("botName", botName);
+                Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
                 Bson updatedAddyDoc = new Document("EthNetworkType", EthNetworkType);
                 Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
+                assert foundBotNameDoc != null;
                 botControlCollection.updateOne(clientSession, foundBotNameDoc, updateAddyDocOperation);
                 clientSession.commitTransaction();
                 sendMessage(chatId, "Operation Successful");
@@ -454,19 +510,27 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         }
     }
 
-    public void enqueueMessageForSend(long chat_id, String msg, int sendStatus, String... url) {
+    public void enqueueMessageForSend(long chat_id, String msg, int sendStatus, TransactionData transactionData, String... url) {
         try {
             if (url.length == 0) {
                 SendMessage sendMessage = new SendMessage();
                 sendMessage.setText(msg);
                 sendMessage.setChatId(chat_id);
-                allPendingMessages.putLast(new TelegramMessage(sendMessage, sendStatus));
+                if(transactionData == null) {
+                    allPendingMessages.putLast(new TelegramMessage(sendMessage, sendStatus));
+                } else {
+                    allPendingMessages.putLast(new TelegramMessage(sendMessage, sendStatus, transactionData));
+                }
             } else {
                 SendAnimation sendAnimation = new SendAnimation();
                 sendAnimation.setAnimation(url[(int) (Math.random() * (url.length))]);
                 sendAnimation.setCaption(msg);
                 sendAnimation.setChatId(chat_id);
-                allPendingMessages.putLast(new TelegramMessage(sendAnimation, sendStatus));
+                if(transactionData == null) {
+                    allPendingMessages.putLast(new TelegramMessage(sendAnimation, sendStatus));
+                } else {
+                    allPendingMessages.putLast(new TelegramMessage(sendAnimation, sendStatus, transactionData));
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -474,7 +538,11 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     }
 
     public boolean deleteGame(long chat_id, Game game) {
+        System.out.println("\n...Request made to delete the Game...");
         if (allPendingMessages.size() != 0) {
+            if(!messageSendingExecuter.isShutdown()) {
+                System.out.println("Request to close the game with message sender shutdown and pending message > 0");
+            }
             return false;
         }
         if (!messageSendingExecuter.isShutdown()) {
@@ -492,9 +560,15 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     }
                 }
                 executorService.shutdown();
-                System.out.println("Game end successful.");
+                System.out.println("Game ExecutorService end successful.");
             }
         }.start();
+        Document botNameDoc = new Document("botName", botName);
+        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+        Bson updatedAddyDoc = new Document("wasGameEndMessageSent", true);
+        Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
+        assert foundBotNameDoc != null;
+        botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
         currentlyActiveGames.remove(chat_id);
         lastSendStatus = -1;
         return true;
@@ -505,23 +579,23 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     }
 
     public void setTotalRTKForPoolInWallet(String amount) {
-        walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
-        foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+        Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
+        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         Bson updateWalletDoc = new Document("totalRTKBalanceForPool", amount);
         Bson updateWalletDocOperation = new Document("$set", updateWalletDoc);
         walletDistributionCollection.updateOne(foundWalletDetailDoc, updateWalletDocOperation);
     }
 
     public String getTotalRTKForPoolInWallet() {
-        walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
-        foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+        Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
+        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         assert foundWalletDetailDoc != null;
         return (String) foundWalletDetailDoc.get("totalRTKBalanceForPool");
     }
 
     public void addAmountToWalletFeesBalance(String amount) {
-        walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
-        foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+        Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
+        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         assert foundWalletDetailDoc != null;
         BigInteger balance = new BigInteger((String) foundWalletDetailDoc.get("balanceCollectedAsFees"));
         balance = balance.add(new BigInteger(amount));
@@ -531,25 +605,69 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     }
 
     public String getWalletFeesBalance() {
-        walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
-        foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+        Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
+        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         assert foundWalletDetailDoc != null;
         return (String) foundWalletDetailDoc.get("balanceCollectedAsFees");
     }
 
     public TransactionData getLastCheckedTransactionDetails() {
         TransactionData transactionData = new TransactionData();
-        walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
-        foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+        Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
+        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         assert foundWalletDetailDoc != null;
         transactionData.blockNumber = new BigInteger((String) foundWalletDetailDoc.get("lastCheckedBlockNumber"));
         transactionData.trxIndex = new BigInteger((String) foundWalletDetailDoc.get("lastCheckedTransactionIndex"));
         return transactionData;
     }
 
+    public void resetWasGameEndMessageSent() {
+        Document botNameDoc = new Document("botName", botName);
+        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+        Bson updatedAddyDoc = new Document("wasGameEndMessageSent", false);
+        Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
+        assert foundBotNameDoc != null;
+        botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
+    }
+
+    public boolean getWasGameEndMessageSent() {
+        Document botNameDoc = new Document("botName", botName);
+        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+        assert foundBotNameDoc != null;
+        return (boolean) foundBotNameDoc.get("wasGameEndMessageSent");
+    }
+
+    public LastGameState getLastGameState() {
+        try {
+            FileInputStream fileInputStream = new FileInputStream("./PreservedState.bps");
+            ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
+            LastGameState lastGameState = (LastGameState) objectInputStream.readObject();
+            String msg = "\nPrevious State read :- \nTrxData -->";
+            if(lastGameState.lastCheckedTransactionData != null) {
+                msg += lastGameState.lastCheckedTransactionData.toString();
+            } else {
+                msg += "null";
+            }
+            msg += "\nEnd Time --> ";
+            if(lastGameState.lastGameEndTime != null) {
+                msg += lastGameState.lastGameEndTime.toString();
+            } else {
+                msg += "null";
+            }
+            System.out.println(msg);
+            lastSavedStateTransactionData = lastGameState.lastCheckedTransactionData;
+            objectInputStream.close();
+            fileInputStream.close();
+            return lastGameState;
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
     public void setLastCheckedTransactionDetails(TransactionData transactionData) {
-        walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
-        foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+        Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
+        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         assert foundWalletDetailDoc != null;
         Bson updateWalletDoc = new Document("lastCheckedBlockNumber", transactionData.blockNumber.toString())
                 .append("lastCheckedTransactionIndex", transactionData.trxIndex.toString());

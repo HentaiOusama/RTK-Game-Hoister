@@ -1,6 +1,7 @@
+import java.io.Serializable;
 import java.math.BigInteger;
 
-public class TransactionData implements Comparable<TransactionData> {
+public class TransactionData implements Comparable<TransactionData>, Serializable {
     String trxHash;
     String methodName;
     String fromAddress;
