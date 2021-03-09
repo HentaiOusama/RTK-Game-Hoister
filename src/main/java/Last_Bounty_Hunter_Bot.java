@@ -7,9 +7,12 @@ import com.mongodb.client.MongoCollection;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendAnimation;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.*;
 import java.math.BigInteger;
@@ -67,6 +70,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     public volatile boolean makeChecks = false;
     public volatile TransactionData lastSavedStateTransactionData = null;
     public volatile int lastSendStatus = -1;
+    private boolean shouldAllowMessageFlow = true;
 
     // Blockchain Related Stuff
     private String EthNetworkType;
@@ -88,7 +92,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
 
     Last_Bounty_Hunter_Bot(String shotWallet) {
         this.shotWallet = shotWallet;
-
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
@@ -122,7 +125,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         // Mongo Stuff
         ConnectionString connectionString = new ConnectionString(
                 "mongodb+srv://" + System.getenv("lastBountyHunterMonoID") + ":" +
-                System.getenv("lastBountyHunterMonoPass") + "@hellgatesbotcluster.zm0r5.mongodb.net/test"
+                System.getenv("lastBountyHunterMonoPass") + "@hellgatesbotcluster.zm0r5.mongodb.net/test" +
+                        "?keepAlive=true&poolSize=30&autoReconnect=true&socketTimeoutMS=360000&connectTimeoutMS=360000"
         );
         MongoClientSettings mongoClientSettings = MongoClientSettings.builder()
                 .applyConnectionString(connectionString).retryWrites(true).build();
@@ -152,26 +156,31 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         this.EthNetworkType = (String) foundBotNameDoc.get("EthNetworkType");
         this.shotCost = new BigInteger((String) foundBotNameDoc.get("shotCost"));
 
-        if (EthNetworkType.equals("mainnet")) {
-            RTKContractAddresses = new String[]{"0x1F6DEADcb526c4710Cf941872b86dcdfBbBD9211",
+        switch (EthNetworkType) {
+            case "mainnet" -> RTKContractAddresses = new String[]{"0x1F6DEADcb526c4710Cf941872b86dcdfBbBD9211",
                     "0x66bc87412a2d92a2829137ae9dd0ee063cd0f201", "0xb0f87621a43f50c3b7a0d9f58cc804f0cdc5c267",
                     "0x4a1c95097473c54619cb0e22c6913206b88b9a1a", "0x63b9713df102ea2b484196a95cdec5d8af278a60"};
-        } else if (EthNetworkType.equals("ropsten")) {
-            RTKContractAddresses = new String[]{"0x38332D8671961aE13d0BDe040d536eB336495eEA",
+            case "ropsten" -> RTKContractAddresses = new String[]{"0x38332D8671961aE13d0BDe040d536eB336495eEA",
                     "0x9C72573A47b0d81Ef6048c320bF5563e1606A04C", "0x136A5c9B9965F3827fbB7A9e97E41232Df168B08",
                     "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8", "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d"};
+            case "maticMainnet" -> RTKContractAddresses = new String[]{"0x38332D8671961aE13d0BDe040d536eB336495eEA",
+                    "0x136A5c9B9965F3827fbB7A9e97E41232Df168B08", "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8",
+                    "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d", "0x88dD15CEac31a828e06078c529F5C1ABB214b6E8"};
         }
 
         if (shouldRunGame) {
             messageSendingExecuter.scheduleWithFixedDelay(new messageSender(), 0, 800, TimeUnit.MILLISECONDS);
-            if (EthNetworkType.equals("mainnet")) {
-                Game newGame = new Game(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
-                currentlyActiveGames.put(actualGameChatId, newGame);
-                executorService.execute(newGame);
-            } else if (EthNetworkType.equals("ropsten")) {
-                Game newGame = new Game(this, testingChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
-                currentlyActiveGames.put(testingChatId, newGame);
-                executorService.execute(newGame);
+            switch (EthNetworkType) {
+                case "mainnet", "maticMainnet" -> {
+                    Game newGame = new Game(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
+                    currentlyActiveGames.put(actualGameChatId, newGame);
+                    executorService.execute(newGame);
+                }
+                case "ropsten" -> {
+                    Game newGame = new Game(this, testingChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
+                    currentlyActiveGames.put(testingChatId, newGame);
+                    executorService.execute(newGame);
+                }
             }
         }
     }
@@ -185,7 +194,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     String text = update.getMessage().getText();
                     if (!shouldRunGame && text.equalsIgnoreCase("run")) {
                         try {
-                            if (EthNetworkType.equals("mainnet") && !currentlyActiveGames.containsKey(actualGameChatId)) {
+                            if ((EthNetworkType.equals("mainnet") || EthNetworkType.equals("maticMainnet")) && !currentlyActiveGames.containsKey(actualGameChatId)) {
                                 Game newGame = new Game(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
                                 currentlyActiveGames.put(actualGameChatId, newGame);
                                 if (!executorService.isShutdown()) {
@@ -225,10 +234,13 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                         }
                     }
                     else if (text.equalsIgnoreCase("Switch to mainnet")) {
-                        switchNetworks(chatId, "ropsten", "mainnet");
+                        switchNetworks(chatId, EthNetworkType, "mainnet");
                     }
                     else if (text.equalsIgnoreCase("Switch to ropsten")) {
-                        switchNetworks(chatId, "mainnet", "ropsten");
+                        switchNetworks(chatId, EthNetworkType, "ropsten");
+                    }
+                    else if (text.equalsIgnoreCase("Switch to maticMainnet")) {
+                        switchNetworks(chatId, EthNetworkType, "maticMainnet");
                     }
                     else if (shouldRunGame && text.equalsIgnoreCase("stopBot")) {
                         shouldRunGame = false;
@@ -358,11 +370,27 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                             currentlyActiveGames.get(chat_Id).setShouldTryToEstablishConnection();
                         }
                     }
+                    else if (text.toLowerCase().startsWith("setmessageflow to ")) {
+                        if(!shouldRunGame) {
+                            String[] input = text.toLowerCase().trim().split(" ");
+                            shouldAllowMessageFlow = Boolean.parseBoolean(input[2]);
+                        } else {
+                            SendMessage sendMessage = new SendMessage();
+                            sendMessage.setChatId(chatId);
+                            sendMessage.setText("Stop All Games Before Changing the Value.");
+                            try {
+                                super.execute(sendMessage);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
                     else if (text.equalsIgnoreCase("Commands")) {
                         sendMessage(update.getMessage().getChatId(), """
                                 Run
                                 Switch to mainnet
                                 Switch to ropsten
+                                Switch to maticMainnet
                                 StopBot
                                 ActiveProcesses
                                 setPot amount
@@ -374,6 +402,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                                 rebuildAdmins
                                 setTopUpWallet walletAddress
                                 resetWebSocketConnection
+                                setMessageFlow to boolean
                                 Commands
 
                                 (amount has to be bigInteger including 18 decimal eth precision)""");
@@ -382,10 +411,9 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     else {
                         sendMessage(update.getMessage().getChatId(), "Such command does not exists. BaaaaaaaaaKa");
                     }
-                    sendMessage(update.getMessage().getChatId(), "shouldRunGame = " + shouldRunGame + "\nEthNetworkType = "
-                            + EthNetworkType + "\nRTKContractAddresses = " + Arrays.toString(RTKContractAddresses));
+                    sendMessage(update.getMessage().getChatId(), "shouldRunGame = " + shouldRunGame + "\nEthNetworkType = " + EthNetworkType +
+                            "\nshouldAllowMessageFlow = " + shouldAllowMessageFlow + "\nRTKContractAddresses = " + Arrays.toString(RTKContractAddresses));
                 }
-                // Can add special operation for admin here
                 return;
             }
 
@@ -421,6 +449,24 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     @Override
     public String getBotToken() {
         return (System.getenv("lastBountyHunterBotTokenA") + ":" + System.getenv("lastBountyHunterBotTokenB"));
+    }
+
+    @Override
+    public <T extends Serializable, Method extends BotApiMethod<T>> T execute(Method method) throws TelegramApiException {
+        if(shouldAllowMessageFlow) {
+            return super.execute(method);
+        } else {
+            return null;
+        }
+    }
+
+    @Override
+    public Message execute(SendAnimation sendAnimation) throws TelegramApiException {
+        if(shouldAllowMessageFlow) {
+            return super.execute(sendAnimation);
+        } else {
+            return null;
+        }
     }
 
     private void switchNetworks(long chatId, String from, String to) {
@@ -583,6 +629,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         Bson updateWalletDoc = new Document("totalRTKBalanceForPool", amount);
         Bson updateWalletDocOperation = new Document("$set", updateWalletDoc);
+        assert foundWalletDetailDoc != null;
         walletDistributionCollection.updateOne(foundWalletDetailDoc, updateWalletDocOperation);
     }
 

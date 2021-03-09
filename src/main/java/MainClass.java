@@ -44,7 +44,6 @@ public class MainClass {
         initialize();
         TelegramBotsApi telegramBotsApi = new TelegramBotsApi();
         try {
-
             telegramBotsApi.registerBot(new Last_Bounty_Hunter_Bot(shotWallet));
         } catch (Exception e) {
             e.printStackTrace();

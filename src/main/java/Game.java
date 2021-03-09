@@ -17,7 +17,6 @@ import org.web3j.protocol.core.methods.request.EthFilter;
 import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.core.methods.response.Transaction;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
-import org.web3j.protocol.core.methods.response.Web3ClientVersion;
 import org.web3j.protocol.websocket.WebSocketClient;
 import org.web3j.protocol.websocket.WebSocketService;
 import org.web3j.tx.gas.ContractGasProvider;
@@ -46,7 +45,7 @@ public class Game implements Runnable {
         public void run() {
             if (Instant.now().compareTo(currentRoundEndTime) <= 0) {
                 try {
-                    finalLatestBlockNumber = web3j.ethBlockNumber().send().getBlockNumber();
+                    finalLatestBlockNumber = web3j[4].ethBlockNumber().send().getBlockNumber();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -57,28 +56,38 @@ public class Game implements Runnable {
     private class webSocketReconnect implements Runnable {
         @Override
         public void run() {
-            if (shouldTryToEstablishConnection && transactionsUnderReview.size() == 0 && validTransactions.size() == 0 && webSocketService != null) {
+            if (shouldTryToEstablishConnection && transactionsUnderReview.size() == 0 && validTransactions.size() == 0) {
+
                 for (int i = 0; i < 5; i++) {
-                    try {
-                        if (!disposable[i].isDisposed()) {
-                            disposable[i].dispose();
+                    if(webSocketService[i] != null) {
+                        try {
+                            if (!disposable[i].isDisposed()) {
+                                disposable[i].dispose();
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
                         }
-                    } catch (Exception e) {
-                        e.printStackTrace();
+                        try {
+                            web3j[i].shutdown();
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                        try {
+                            webSocketService[i].close();
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                     }
                 }
                 try {
-                    web3j.shutdown();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                try {
-                    webSocketService.close();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                try {
-                    buildCustomBlockchainReader(false);
+                    if(connectionCount == 5) {
+                        getCurrentGameDeleted();
+                    }
+                    if(!buildCustomBlockchainReader(false)) {
+                        connectionCount++;
+                    } else {
+                        connectionCount = 0;
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -98,14 +107,15 @@ public class Game implements Runnable {
     public volatile boolean shouldRecoverFromAbruptInterruption = false;
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     private final ScheduledExecutorService scheduledExecutorService2 = Executors.newSingleThreadScheduledExecutor();
+    private int connectionCount = 0;
 
     // Blockchain Related Stuff
     private final String EthNetworkType, shotWallet;
     private final BigInteger shotCost, decimals = new BigInteger("1000000000000000000");
     private final String[] RTKContractAddresses, prevHash = {null, null, null, null, null};
     private final ArrayList<String> webSocketUrls = new ArrayList<>();
-    private WebSocketService webSocketService;
-    private Web3j web3j;
+    private final WebSocketService[] webSocketService = new WebSocketService[5];
+    private final Web3j[] web3j = new Web3j[5];
     private final Disposable[] disposable;
     private final ArrayList<TransactionData> validTransactions = new ArrayList<>(), transactionsUnderReview = new ArrayList<>();
     private boolean shouldTryToEstablishConnection = true;
@@ -126,16 +136,26 @@ public class Game implements Runnable {
 
         ///// Setting web3 data
         // Connecting to web3 client
-        webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/04009a10020d420bbab54951e72e23fd");
-        webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/94fead43844d49de833adffdf9ff3993");
-        webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/b8440ab5890a4d539293994119b36893");
-        webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/b05a1fe6f7b64750a10372b74dec074f");
-        webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/2e98f2588f85423aa7bced2687b8c2af");
-        /////
-
-        if (EthNetworkType.equalsIgnoreCase("ropsten")) {
-            last_bounty_hunter_bot.sendMessage(chat_id, "Warning! The bot is running on Ropsten network and not on Mainnet.");
+        if(EthNetworkType.equals("maticMainnet")) {
+            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/56aa369ae7fd09b65b52f932d7410d38ba287d07");
+            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/3b0b0d6046e7da8da765b05296085f8c97753c61");
+            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/d02da2509d64cf806714e1ddcd54e4c179c13d4e");
+            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/a149b4ed97ba55c6edad87c488229015d3d7124a");
+            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/b59593f7317289035dee5b626e6d3d6dd95c4c91");
+            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/d8fdfd183f6bc45dd2ad4809f22687b29ca4b85c");
+            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/c2f20b22705f9c45d1337380a28d6613e08310d6");
+            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/94ef8862aaa7f832ca421d4e01da3fb5a5313969");
+            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/e247aacac4d9d2cc83a8e81cd51c3ec36a2f5a93");
+            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/eee88d447ebc33a64f5acf891270517ff506330b");
+            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/d2b3d15442e3631d4a11324eda64d05a6404a2e8");
+        } else {
+            webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/04009a10020d420bbab54951e72e23fd");
+            webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/94fead43844d49de833adffdf9ff3993");
+            webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/b8440ab5890a4d539293994119b36893");
+            webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/b05a1fe6f7b64750a10372b74dec074f");
+            webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/2e98f2588f85423aa7bced2687b8c2af");
         }
+        /////
     }
 
     @Override
@@ -154,6 +174,13 @@ public class Game implements Runnable {
             lastGameEndTime = last_bounty_hunter_bot.getLastGameState().lastGameEndTime;
         } else {
             last_bounty_hunter_bot.makeChecks = false;
+        }
+        if (EthNetworkType.equalsIgnoreCase("ropsten")) {
+            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Warning! The bot is running on Ethereum Ropsten network and not on Mainnet.", -1, null);
+        } else if (EthNetworkType.equalsIgnoreCase("mainnet")) {
+            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "The bot is running on Ethereum Mainnet network.", -1, null);
+        } else if (EthNetworkType.equalsIgnoreCase("maticMainnet")) {
+            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Warning! The bot is running on MATIC Mainnet network", -1, null);
         }
         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                         Welcome to the Last Bounty Hunter game.
@@ -465,6 +492,9 @@ public class Game implements Runnable {
                     "\n\nPlease Contact @OreGaZembuTouchiSuru");
         }
 
+        last_bounty_hunter_bot.setTotalRTKForPoolInWallet(netCurrentPool.toString());
+        last_bounty_hunter_bot.addAmountToWalletFeesBalance("0");
+        last_bounty_hunter_bot.setLastCheckedTransactionDetails(lastCheckedTransactionData);
 
         getCurrentGameDeleted();
     }
@@ -511,6 +541,7 @@ public class Game implements Runnable {
         }
         performProperWait(1);
         for (int i = 0; i < 5; i++) {
+            System.out.println("XXXXX\nXXXXX\ni : " + i + "\nXXXXX\nXXXXX");
             try {
                 if (!disposable[i].isDisposed()) {
                     disposable[i].dispose();
@@ -518,16 +549,16 @@ public class Game implements Runnable {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }
-        try {
-            web3j.shutdown();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        try {
-            webSocketService.close();
-        } catch (Exception e) {
-            e.printStackTrace();
+            try {
+                web3j[i].shutdown();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            try {
+                webSocketService[i].close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
         hasGameClosed = true;
         last_bounty_hunter_bot.sendMessage(chat_id, "The bot has been shut down. Please don't send any transactions now.");
@@ -549,29 +580,24 @@ public class Game implements Runnable {
         }
         System.out.println("Connecting to Web3");
         shouldTryToEstablishConnection = true;
-        while (shouldTryToEstablishConnection && count < 6) {
+        while (shouldTryToEstablishConnection && count < 5) {
             count++;
+            Collections.shuffle(webSocketUrls);
             try {
-                Collections.shuffle(webSocketUrls);
-                WebSocketClient webSocketClient = new WebSocketClient(new URI(webSocketUrls.get(0))) {
-                    @Override
-                    public void onClose(int code, String reason, boolean remote) {
-                        super.onClose(code, reason, remote);
-                        logger.info(chat_id + " : WebSocket connection to " + uri + " closed successfully " + reason);
-                        setShouldTryToEstablishConnection();
-                    }
-
-                    @Override
-                    public void onError(Exception e) {
-                        super.onError(e);
-                        e.printStackTrace();
-                        setShouldTryToEstablishConnection();
-                        logger.error(chat_id + " : WebSocket connection to " + uri + " failed with error");
-                        System.out.println("Trying again");
-                    }
-                };
-                webSocketService = new WebSocketService(webSocketClient, true);
-                webSocketService.connect();
+                for(int i = 0; i < 5; i++) {
+                    WebSocketClient webSocketClient = new WebSocketClient(new URI(webSocketUrls.get(i))) {
+                        @Override
+                        public void onError(Exception e) {
+                            super.onError(e);
+                            setShouldTryToEstablishConnection();
+                            logger.error("XXXXX\nXXXXX\n" + chat_id + " : WebSocket connection to " + uri + " failed.... \nClass : Game.java\nLine No. : " +
+                                    e.getStackTrace()[0].getLineNumber() + "\nXXXXX\nXXXXX");
+                            System.out.println("Trying again");
+                        }
+                    };
+                    webSocketService[i] = new WebSocketService(webSocketClient, true);
+                    webSocketService[i].connect();
+                }
                 shouldTryToEstablishConnection = false;
             } catch (Exception e) {
                 e.printStackTrace();
@@ -580,24 +606,26 @@ public class Game implements Runnable {
         }
 
         try {
-            web3j = Web3j.build(webSocketService);
-            Web3ClientVersion web3ClientVersion = web3j.web3ClientVersion().send();
-            System.out.println("\n\n\nGame's Chat ID : " + chat_id + "\nWeb3ClientVersion : " + web3ClientVersion.getWeb3ClientVersion());
+            for(int i = 0; i < 5; i++) {
+                web3j[i] = Web3j.build(webSocketService[i]);
+                System.out.println("\n\n\nGame's Chat ID : " + chat_id + "\nWeb3ClientVersion[" + i + "] : "
+                        + web3j[i].web3ClientVersion().send().getWeb3ClientVersion());
+            }
 
             EthFilter[] RTKContractFilter = new EthFilter[5];
             for (int i = 0; i < 5; i++) {
+                System.out.println("Last Checked Block Number : " + lastCheckedTransactionData.blockNumber);
                 RTKContractFilter[i] = new EthFilter(new DefaultBlockParameterNumber(lastCheckedTransactionData.blockNumber),
                         DefaultBlockParameterName.LATEST, RTKContractAddresses[i]);
                 int finalI = i;
-                disposable[i] = web3j.ethLogFlowable(RTKContractFilter[i]).subscribe(log -> {
+                disposable[i] = web3j[finalI].ethLogFlowable(RTKContractFilter[i]).subscribe(log -> {
                     String hash = log.getTransactionHash();
                     if ((prevHash[finalI] == null) || (!prevHash[finalI].equalsIgnoreCase(hash))) {
-                        Optional<Transaction> trx = web3j.ethGetTransactionByHash(hash).send().getTransaction();
+                        Optional<Transaction> trx = web3j[finalI].ethGetTransactionByHash(hash).send().getTransaction();
                         if (trx.isPresent()) {
                             TransactionData currentTrxData = splitInputData(log, trx.get());
                             currentTrxData.X = finalI + 1;
-                            System.out.print("Chat ID : " + chat_id + " - Trx :  " + log.getTransactionHash() + ", X = " + (finalI + 1) +
-                                    ", Did Burn = " + currentTrxData.didBurn + ", Was Counted = ");
+                            System.out.print("Chat ID : " + chat_id + " ===>> " + currentTrxData + ", Was Counted = ");
                             if (!currentTrxData.methodName.equals("Useless") && currentTrxData.toAddress.equalsIgnoreCase(shotWallet)
                                     && currentTrxData.value.compareTo(shotCost) >= 0 && currentTrxData.compareTo(lastCheckedTransactionData) > 0) {
                                 validTransactions.add(currentTrxData);
@@ -610,13 +638,14 @@ public class Game implements Runnable {
                     prevHash[finalI] = hash;
                 }, throwable -> {
                     throwable.printStackTrace();
-                    webSocketService.close();
-                    webSocketService.connect();
+                    webSocketService[finalI].close();
+                    webSocketService[finalI].connect();
                 });
             }
             System.out.println("\n\n\n");
         } catch (IOException e) {
             e.printStackTrace();
+            return true;
         }
         return !shouldTryToEstablishConnection;
     }
@@ -656,8 +685,8 @@ public class Game implements Runnable {
         boolean retVal = false;
 
         try {
-            gasPrice = web3j.ethGasPrice().send().getGasPrice();
-            BigInteger balance = web3j.ethGetBalance(shotWallet, DefaultBlockParameterName.LATEST).send().getBalance();
+            gasPrice = web3j[4].ethGasPrice().send().getGasPrice();
+            BigInteger balance = web3j[4].ethGetBalance(shotWallet, DefaultBlockParameterName.LATEST).send().getBalance();
             minGasFees = gasPrice.multiply(new BigInteger("195000"));
             System.out.println("Network type = " + EthNetworkType + ", Wallet Balance = " + balance + ", Required Balance = " + minGasFees +
                     ", gasPrice = " + gasPrice);
@@ -673,7 +702,7 @@ public class Game implements Runnable {
 
     private void sendRewardToWinner(BigInteger amount, String toAddress) {
         try {
-            TransactionReceipt trxReceipt = ERC20.load(RTKContractAddresses[0], web3j, Credentials.create(System.getenv("PrivateKey")),
+            TransactionReceipt trxReceipt = ERC20.load(RTKContractAddresses[0], web3j[4], Credentials.create(System.getenv("PrivateKey")),
                     new ContractGasProvider() {
                         @Override
                         public BigInteger getGasPrice(String s) {
@@ -727,9 +756,9 @@ public class Game implements Runnable {
                     System.out.println("Trying again");
                 }
             };
-            webSocketService = new WebSocketService(webSocketClient, true);
-            webSocketService.connect();
-            web3j = Web3j.build(webSocketService);
+            webSocketService[0] = new WebSocketService(webSocketClient, true);
+            webSocketService[0].connect();
+            web3j[4] = Web3j.build(webSocketService[0]);
             BigInteger finalValue = new BigInteger("0");
             for (int i = 0; i < 5; i++) {
                 Function function = new Function("balanceOf",
@@ -738,15 +767,15 @@ public class Game implements Runnable {
                         }));
 
                 String encodedFunction = FunctionEncoder.encode(function);
-                org.web3j.protocol.core.methods.response.EthCall response = web3j.ethCall(
+                org.web3j.protocol.core.methods.response.EthCall response = web3j[4].ethCall(
                         org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(shotWallet, RTKContractAddresses[i], encodedFunction),
                         DefaultBlockParameterName.LATEST).send();
                 List<Type> balances = FunctionReturnDecoder.decode(
                         response.getValue(), function.getOutputParameters());
                 finalValue = finalValue.add(new BigInteger(balances.get(0).getValue().toString()));
             }
-            web3j.shutdown();
-            webSocketService.close();
+            web3j[4].shutdown();
+            webSocketService[0].close();
             return finalValue;
         } catch (Exception e) {
             e.printStackTrace();

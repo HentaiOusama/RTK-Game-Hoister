@@ -42,6 +42,6 @@ public class TransactionData implements Comparable<TransactionData>, Serializabl
     @Override
     public String toString() {
         return "TrxHash : " + trxHash + ", from : " + fromAddress + ", to : " + toAddress + ", X : " + X + ", DidBurn : " + didBurn + ", Block : "
-                + blockNumber + ", TrxIndex : " + trxIndex;
+                + blockNumber + ", TrxIndex : " + trxIndex + ", Value : " + value;
     }
 }
