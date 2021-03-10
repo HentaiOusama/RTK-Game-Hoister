@@ -66,7 +66,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     private boolean shouldRunGame;
     private ArrayList<Long> allAdmins = new ArrayList<>();
     public volatile String topUpWalletAddress;
-    private final long testingChatId = -1001477389485L, actualGameChatId = -1001275436629L;
+    private final long testingChatId = -1001477389485L, actualGameChatId = -1001275436629L, mainRuletkaChatID = -1001303208172L;
     public volatile boolean makeChecks = false;
     public volatile TransactionData lastSavedStateTransactionData = null;
     public volatile int lastSendStatus = -1;
@@ -166,6 +166,9 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
             case "maticMainnet" -> RTKContractAddresses = new String[]{"0x38332D8671961aE13d0BDe040d536eB336495eEA",
                     "0x136A5c9B9965F3827fbB7A9e97E41232Df168B08", "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8",
                     "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d", "0x88dD15CEac31a828e06078c529F5C1ABB214b6E8"};
+            case "maticMumbai" -> RTKContractAddresses = new String[] {"0x54320152Eb8889a9b28048280001549FAC3E26F5",
+                    "0xc21af68636B79A9F12C11740B81558Ad27C038a6", "0x9D27dE8369fc977a3BcD728868984CEb19cF7F66",
+                    "0xc21EE7D6eF734dc00B3c535dB658Ef85720948d3", "0x39b892Cf8238736c038B833d88B8C91B1D5C8158"};
         }
 
         if (shouldRunGame) {
@@ -176,7 +179,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     currentlyActiveGames.put(actualGameChatId, newGame);
                     executorService.execute(newGame);
                 }
-                case "ropsten" -> {
+                case "ropsten", "maticMumbai" -> {
                     Game newGame = new Game(this, testingChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
                     currentlyActiveGames.put(testingChatId, newGame);
                     executorService.execute(newGame);
@@ -192,7 +195,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                 if (update.getMessage().hasText()) {
                     long chatId = update.getMessage().getChatId();
                     String text = update.getMessage().getText();
-                    if (!shouldRunGame && text.equalsIgnoreCase("run")) {
+                    if (!shouldRunGame && text.equalsIgnoreCase("runBot")) {
                         try {
                             if ((EthNetworkType.equals("mainnet") || EthNetworkType.equals("maticMainnet")) && !currentlyActiveGames.containsKey(actualGameChatId)) {
                                 Game newGame = new Game(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
@@ -202,7 +205,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                                 }
                                 executorService = Executors.newCachedThreadPool();
                                 executorService.execute(newGame);
-                            } else if (EthNetworkType.equals("ropsten") && !currentlyActiveGames.containsKey(testingChatId)) {
+                            }
+                            else if ((EthNetworkType.equals("ropsten") || EthNetworkType.equals("maticMumbai")) && !currentlyActiveGames.containsKey(testingChatId)) {
                                 Game newGame = new Game(this, testingChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
                                 currentlyActiveGames.put(testingChatId, newGame);
                                 if (!executorService.isShutdown()) {
@@ -210,7 +214,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                                 }
                                 executorService = Executors.newCachedThreadPool();
                                 executorService.execute(newGame);
-                            } else {
+                            }
+                            else {
                                 throw new Exception("Operation Unsuccessful. Currently a game is running. Let the game finish before starting" +
                                         " the bot.");
                             }
@@ -232,15 +237,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                             e.printStackTrace();
                             sendMessage(chatId, e.getMessage());
                         }
-                    }
-                    else if (text.equalsIgnoreCase("Switch to mainnet")) {
-                        switchNetworks(chatId, EthNetworkType, "mainnet");
-                    }
-                    else if (text.equalsIgnoreCase("Switch to ropsten")) {
-                        switchNetworks(chatId, EthNetworkType, "ropsten");
-                    }
-                    else if (text.equalsIgnoreCase("Switch to maticMainnet")) {
-                        switchNetworks(chatId, EthNetworkType, "maticMainnet");
                     }
                     else if (shouldRunGame && text.equalsIgnoreCase("stopBot")) {
                         shouldRunGame = false;
@@ -266,6 +262,18 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                         }
                         sendMessage(chatId, "Chats with Active Games  :  " + currentlyActiveGames.size() +
                                 "\n\nChats with ongoing Round  :  " + count);
+                    }
+                    else if (text.equalsIgnoreCase("Switch to mainnet")) {
+                        switchNetworks(chatId, EthNetworkType, "mainnet");
+                    }
+                    else if (text.equalsIgnoreCase("Switch to ropsten")) {
+                        switchNetworks(chatId, EthNetworkType, "ropsten");
+                    }
+                    else if (text.equalsIgnoreCase("Switch to maticMainnet")) {
+                        switchNetworks(chatId, EthNetworkType, "maticMainnet");
+                    }
+                    else if (text.equalsIgnoreCase("Switch to maticMumbai")) {
+                        switchNetworks(chatId, EthNetworkType, "maticMumbai");
                     }
                     else if (text.toLowerCase().startsWith("setpot")) {
                         Set<Long> keys = currentlyActiveGames.keySet();
@@ -387,12 +395,13 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     }
                     else if (text.equalsIgnoreCase("Commands")) {
                         sendMessage(update.getMessage().getChatId(), """
-                                Run
+                                runBot
+                                stopBot
+                                ActiveProcesses
                                 Switch to mainnet
                                 Switch to ropsten
                                 Switch to maticMainnet
-                                StopBot
-                                ActiveProcesses
+                                Switch to maticMumbai
                                 setPot amount
                                 getPot
                                 setShotCost amount
@@ -498,16 +507,21 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                 updateWalletDocOperation = new Document("$set", updateWalletDoc);
                 walletDistributionCollection.updateOne(clientSession, foundWalletDetailDoc3, updateWalletDocOperation);
 
-                EthNetworkType = to;
-                if (EthNetworkType.equals("mainnet")) {
-                    RTKContractAddresses = new String[]{"0x1F6DEADcb526c4710Cf941872b86dcdfBbBD9211",
+                switch (to) {
+                    case "mainnet" -> RTKContractAddresses = new String[]{"0x1F6DEADcb526c4710Cf941872b86dcdfBbBD9211",
                             "0x66bc87412a2d92a2829137ae9dd0ee063cd0f201", "0xb0f87621a43f50c3b7a0d9f58cc804f0cdc5c267",
                             "0x4a1c95097473c54619cb0e22c6913206b88b9a1a", "0x63b9713df102ea2b484196a95cdec5d8af278a60"};
-                } else {
-                    RTKContractAddresses = new String[]{"0x38332D8671961aE13d0BDe040d536eB336495eEA",
+                    case "ropsten" -> RTKContractAddresses = new String[]{"0x38332D8671961aE13d0BDe040d536eB336495eEA",
                             "0x9C72573A47b0d81Ef6048c320bF5563e1606A04C", "0x136A5c9B9965F3827fbB7A9e97E41232Df168B08",
                             "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8", "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d"};
+                    case "maticMainnet" -> RTKContractAddresses = new String[]{"0x38332D8671961aE13d0BDe040d536eB336495eEA",
+                            "0x136A5c9B9965F3827fbB7A9e97E41232Df168B08", "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8",
+                            "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d", "0x88dD15CEac31a828e06078c529F5C1ABB214b6E8"};
+                    default -> RTKContractAddresses = new String[] {"0x54320152Eb8889a9b28048280001549FAC3E26F5",
+                            "0xc21af68636B79A9F12C11740B81558Ad27C038a6", "0x9D27dE8369fc977a3BcD728868984CEb19cF7F66",
+                            "0xc21EE7D6eF734dc00B3c535dB658Ef85720948d3", "0x39b892Cf8238736c038B833d88B8C91B1D5C8158"};
                 }
+                EthNetworkType = to;
 
                 Document botNameDoc = new Document("botName", botName);
                 Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();

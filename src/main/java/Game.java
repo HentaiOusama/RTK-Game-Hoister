@@ -56,7 +56,7 @@ public class Game implements Runnable {
     private class webSocketReconnect implements Runnable {
         @Override
         public void run() {
-            if (shouldTryToEstablishConnection && transactionsUnderReview.size() == 0 && validTransactions.size() == 0) {
+            if (allowConnector && shouldTryToEstablishConnection) {
 
                 for (int i = 0; i < 5; i++) {
                     if(webSocketService[i] != null) {
@@ -108,6 +108,9 @@ public class Game implements Runnable {
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     private final ScheduledExecutorService scheduledExecutorService2 = Executors.newSingleThreadScheduledExecutor();
     private int connectionCount = 0;
+    private volatile boolean allowConnector = true;
+    private final boolean shouldSendNotificationToMainRTKChat;
+    private final long mainRuletkaChatID = -1001303208172L;
 
     // Blockchain Related Stuff
     private final String EthNetworkType, shotWallet;
@@ -134,20 +137,23 @@ public class Game implements Runnable {
         this.shotCost = shotCost;
         disposable = new Disposable[5];
 
+        shouldSendNotificationToMainRTKChat = EthNetworkType.toLowerCase().contains("mainnet");
+
         ///// Setting web3 data
         // Connecting to web3 client
-        if(EthNetworkType.equals("maticMainnet")) {
-            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/56aa369ae7fd09b65b52f932d7410d38ba287d07");
-            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/3b0b0d6046e7da8da765b05296085f8c97753c61");
-            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/d02da2509d64cf806714e1ddcd54e4c179c13d4e");
-            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/a149b4ed97ba55c6edad87c488229015d3d7124a");
-            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/b59593f7317289035dee5b626e6d3d6dd95c4c91");
-            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/d8fdfd183f6bc45dd2ad4809f22687b29ca4b85c");
-            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/c2f20b22705f9c45d1337380a28d6613e08310d6");
-            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/94ef8862aaa7f832ca421d4e01da3fb5a5313969");
-            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/e247aacac4d9d2cc83a8e81cd51c3ec36a2f5a93");
-            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/eee88d447ebc33a64f5acf891270517ff506330b");
-            webSocketUrls.add("wss://rpc-mainnet.maticvigil.com/ws/v1/d2b3d15442e3631d4a11324eda64d05a6404a2e8");
+        if(EthNetworkType.startsWith("matic")) {
+            String val = EthNetworkType.substring(5).toLowerCase();
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/56aa369ae7fd09b65b52f932d7410d38ba287d07");
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/3b0b0d6046e7da8da765b05296085f8c97753c61");
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/d02da2509d64cf806714e1ddcd54e4c179c13d4e");
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/a149b4ed97ba55c6edad87c488229015d3d7124a");
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/b59593f7317289035dee5b626e6d3d6dd95c4c91");
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/d8fdfd183f6bc45dd2ad4809f22687b29ca4b85c");
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/c2f20b22705f9c45d1337380a28d6613e08310d6");
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/94ef8862aaa7f832ca421d4e01da3fb5a5313969");
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/e247aacac4d9d2cc83a8e81cd51c3ec36a2f5a93");
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/eee88d447ebc33a64f5acf891270517ff506330b");
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/d2b3d15442e3631d4a11324eda64d05a6404a2e8");
         } else {
             webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/04009a10020d420bbab54951e72e23fd");
             webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/94fead43844d49de833adffdf9ff3993");
@@ -180,7 +186,9 @@ public class Game implements Runnable {
         } else if (EthNetworkType.equalsIgnoreCase("mainnet")) {
             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "The bot is running on Ethereum Mainnet network.", -1, null);
         } else if (EthNetworkType.equalsIgnoreCase("maticMainnet")) {
-            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Warning! The bot is running on MATIC Mainnet network", -1, null);
+            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "The bot is running on MATIC Mainnet network", -1, null);
+        } else if (EthNetworkType.equalsIgnoreCase("maticMumbai")) {
+            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Warning! The bot is running on MATIC Testnet network and not on Mainnet", -1, null);
         }
         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                         Welcome to the Last Bounty Hunter game.
@@ -219,7 +227,7 @@ public class Game implements Runnable {
             return;
         }
 
-        scheduledExecutorService2.scheduleWithFixedDelay(new webSocketReconnect(), 0, 1000, TimeUnit.MILLISECONDS);
+        scheduledExecutorService2.scheduleWithFixedDelay(new webSocketReconnect(), 0, 5000, TimeUnit.MILLISECONDS);
 
         checkForStatus(1);
         if (!last_bounty_hunter_bot.makeChecks) {
@@ -258,6 +266,17 @@ public class Game implements Runnable {
                                         💰 Bounty: %s""", finalSender, getPrizePool()), 3, transactionData,
                                 "https://media.giphy.com/media/xaMURZrCVsFZzK6DnP/giphy.gif",
                                 "https://media.giphy.com/media/UtXbAXl8Pt4Kr0f02Q/giphy.gif");
+                        if(shouldSendNotificationToMainRTKChat) {
+                            last_bounty_hunter_bot.enqueueMessageForSend(mainRuletkaChatID, String.format("""
+                                        💥🔫 First blood!!!
+                                        Hunter %s has the bounty. Shoot him down before he claims it.
+                                        ⏱ Time limit: 30 minutes
+                                        💰 Bounty: %s
+                                        
+                                        Checkout @Last_Bounty_Hunter_RTK group now and grab that bounty""", finalSender, getPrizePool()),
+                                    3, transactionData, "https://media.giphy.com/media/xaMURZrCVsFZzK6DnP/giphy.gif",
+                                    "https://media.giphy.com/media/UtXbAXl8Pt4Kr0f02Q/giphy.gif");
+                        }
                         didSomeoneGotShot = true;
                     } else {
                         addRTKToPot(transactionData.value, transactionData.fromAddress);
@@ -344,6 +363,14 @@ public class Game implements Runnable {
                                 "https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
                                 "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
                                 "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
+                        if(shouldSendNotificationToMainRTKChat) {
+                            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, msgString + """
+                                                                                        
+                                            Checkout @Last_Bounty_Hunter_RTK group now and grab that bounty""", 4, null,
+                                    "https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
+                                    "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
+                                    "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
+                        }
                     }
                     checkForStatus(4);
 
@@ -360,6 +387,11 @@ public class Game implements Runnable {
                             if (Instant.now().compareTo(currentRoundQuarterTime) >= 0) {
                                 last_bounty_hunter_bot.sendMessage(chat_id, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue + " minutes " +
                                         "remaining for the current round. Shoot hunter " + finalSender + " down before he claims the bounty!");
+                                if(shouldSendNotificationToMainRTKChat) {
+                                    last_bounty_hunter_bot.sendMessage(chat_id, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue +
+                                            " minutes remaining for the current round. Shoot hunter " + finalSender + " down before he claims " +
+                                            "the bounty!\n\nCheckout @Last_Bounty_Hunter_RTK group now and grab that bounty");
+                                }
                                 quarterWarn = false;
                             }
                         }
@@ -463,6 +495,12 @@ public class Game implements Runnable {
                                 “Ever notice how you come across somebody once in a while you should not have messed with? That’s me.” 
                                 %s – The Last Bounty Hunter – claimed the bounty and won %s.""", finalSender, getPrizePool()), 49, null,
                         "https://media.giphy.com/media/5obMzX3pRnSSundkPw/giphy.gif", "https://media.giphy.com/media/m3Su0jtjGHMRMnlC7L/giphy.gif");
+                if(shouldSendNotificationToMainRTKChat) {
+                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
+                                %s – The Last Bounty Hunter – claimed the bounty and won %s.
+                                
+                                Checkout @Last_Bounty_Hunter_RTK group now to take part in new Bounty Hunting Round""", finalSender, getPrizePool()), 49, null);
+                }
                 sendRewardToWinner(prizePool, finalSender);
 
                 last_bounty_hunter_bot.setTotalRTKForPoolInWallet((netCurrentPool.multiply(BigInteger.valueOf(2))).divide(BigInteger.valueOf(5)).toString());
@@ -475,12 +513,14 @@ public class Game implements Runnable {
                     last_bounty_hunter_bot.makeChecks = false;
                 }
                 isGameRunning = false;
+                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Updated Bounty Available for Hunters to Grab : " + prizePool,
+                        51, null);
 
-                checkForStatus(50);
+                checkForStatus(51);
                 last_bounty_hunter_bot.lastSendStatus = 1;
                 if (notHasEnoughBalance()) {
-                    last_bounty_hunter_bot.sendMessage(chat_id, "Rewards Wallet " + shotWallet + " doesn't have enough eth for transactions. " +
-                            "Please contact admins. Closing Game\n\nMinimum eth required : " + new BigDecimal(minGasFees).divide(
+                    last_bounty_hunter_bot.sendMessage(chat_id, "Rewards Wallet " + shotWallet + " doesn't have enough currency for transactions. " +
+                            "Please contact admins. Closing Game\n\nMinimum currency required : " + new BigDecimal(minGasFees).divide(
                             new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN) + ". Actual Balance = " + rewardWalletBalance +
                             "\n\n\nThe bot will not read any transactions till the balances is updated by admins.");
                     break;
@@ -530,6 +570,7 @@ public class Game implements Runnable {
     }
 
     private void getCurrentGameDeleted() {
+        allowConnector = false;
         while (!last_bounty_hunter_bot.deleteGame(chat_id, this)) {
             performProperWait(1.5);
         }
@@ -539,9 +580,11 @@ public class Game implements Runnable {
         if (!scheduledExecutorService2.isShutdown()) {
             scheduledExecutorService2.shutdownNow();
         }
+        hasGameClosed = true;
+        last_bounty_hunter_bot.sendMessage(chat_id, "The bot has been shut down. Please don't send any transactions now.");
         performProperWait(1);
         for (int i = 0; i < 5; i++) {
-            System.out.println("XXXXX\nXXXXX\ni : " + i + "\nXXXXX\nXXXXX");
+            System.out.println("XXXXX\nXXXXX\nGetGameDeletedDisposer - i : " + i + "\nXXXXX\nXXXXX");
             try {
                 if (!disposable[i].isDisposed()) {
                     disposable[i].dispose();
@@ -560,8 +603,6 @@ public class Game implements Runnable {
                 e.printStackTrace();
             }
         }
-        hasGameClosed = true;
-        last_bounty_hunter_bot.sendMessage(chat_id, "The bot has been shut down. Please don't send any transactions now.");
         System.out.println("Game Closed...");
     }
 
@@ -575,24 +616,51 @@ public class Game implements Runnable {
 
         int count = 0;
         if (shouldSendMessage) {
-            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Connecting to Ethereum Network to read transactions. Please be patient. " +
+            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Connecting to Blockchain Network to read transactions. Please be patient. " +
                     "This can take from few seconds to few minutes", 1, null);
         }
         System.out.println("Connecting to Web3");
         shouldTryToEstablishConnection = true;
-        while (shouldTryToEstablishConnection && count < 5) {
+        while (shouldTryToEstablishConnection && count < 2) {
             count++;
+            for (int i = 0; i < 5; i++) {
+                System.out.println("XXXXX\nXXXXX\nDisposer Before Re-ConnectionBuilder - i : " + i + "\nXXXXX\nXXXXX");
+                try {
+                    if (!disposable[i].isDisposed()) {
+                        disposable[i].dispose();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                try {
+                    web3j[i].shutdown();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                try {
+                    webSocketService[i].close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
             Collections.shuffle(webSocketUrls);
             try {
                 for(int i = 0; i < 5; i++) {
-                    WebSocketClient webSocketClient = new WebSocketClient(new URI(webSocketUrls.get(i))) {
+                    int finalI = i;
+                    WebSocketClient webSocketClient = new WebSocketClient(new URI(webSocketUrls.get(finalI))) {
+                        @Override
+                        public void onClose(int code, String reason, boolean remote) {
+                            super.onClose(code, reason, remote);
+                            logger.info(chat_id + " : WebSocket connection to " + uri + " closed successfully " + reason + ", With i = " + finalI);
+                            setShouldTryToEstablishConnection();
+                        }
+
                         @Override
                         public void onError(Exception e) {
                             super.onError(e);
                             setShouldTryToEstablishConnection();
                             logger.error("XXXXX\nXXXXX\n" + chat_id + " : WebSocket connection to " + uri + " failed.... \nClass : Game.java\nLine No. : " +
-                                    e.getStackTrace()[0].getLineNumber() + "\nXXXXX\nXXXXX");
-                            System.out.println("Trying again");
+                                    e.getStackTrace()[0].getLineNumber() + "\nTrying For Reconnect...- i : " + finalI + "\nXXXXX\nXXXXX");
                         }
                     };
                     webSocketService[i] = new WebSocketService(webSocketClient, true);
