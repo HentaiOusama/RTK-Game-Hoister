@@ -110,7 +110,6 @@ public class Game implements Runnable {
     private int connectionCount = 0;
     private volatile boolean allowConnector = true;
     private final boolean shouldSendNotificationToMainRTKChat;
-    private final long mainRuletkaChatID = -1001303208172L;
 
     // Blockchain Related Stuff
     private final String EthNetworkType, shotWallet;
@@ -253,6 +252,7 @@ public class Game implements Runnable {
                 }
                 Collections.sort(transactionsUnderReview);
 
+                long mainRuletkaChatID = -1001303208172L;
                 while (transactionsUnderReview.size() > 0 && !didSomeoneGotShot) {
                     transactionData = transactionsUnderReview.remove(0);
                     lastCheckedTransactionData = transactionData;
@@ -364,7 +364,7 @@ public class Game implements Runnable {
                                 "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
                                 "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
                         if(shouldSendNotificationToMainRTKChat) {
-                            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, msgString + """
+                            last_bounty_hunter_bot.enqueueMessageForSend(mainRuletkaChatID, msgString + """
                                                                                         
                                             Checkout @Last_Bounty_Hunter_RTK group now and grab that bounty""", 4, null,
                                     "https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
@@ -388,7 +388,7 @@ public class Game implements Runnable {
                                 last_bounty_hunter_bot.sendMessage(chat_id, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue + " minutes " +
                                         "remaining for the current round. Shoot hunter " + finalSender + " down before he claims the bounty!");
                                 if(shouldSendNotificationToMainRTKChat) {
-                                    last_bounty_hunter_bot.sendMessage(chat_id, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue +
+                                    last_bounty_hunter_bot.sendMessage(mainRuletkaChatID, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue +
                                             " minutes remaining for the current round. Shoot hunter " + finalSender + " down before he claims " +
                                             "the bounty!\n\nCheckout @Last_Bounty_Hunter_RTK group now and grab that bounty");
                                 }
@@ -496,7 +496,7 @@ public class Game implements Runnable {
                                 %s – The Last Bounty Hunter – claimed the bounty and won %s.""", finalSender, getPrizePool()), 49, null,
                         "https://media.giphy.com/media/5obMzX3pRnSSundkPw/giphy.gif", "https://media.giphy.com/media/m3Su0jtjGHMRMnlC7L/giphy.gif");
                 if(shouldSendNotificationToMainRTKChat) {
-                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
+                    last_bounty_hunter_bot.enqueueMessageForSend(mainRuletkaChatID, String.format("""
                                 %s – The Last Bounty Hunter – claimed the bounty and won %s.
                                 
                                 Checkout @Last_Bounty_Hunter_RTK group now to take part in new Bounty Hunting Round""", finalSender, getPrizePool()), 49, null);
@@ -513,7 +513,7 @@ public class Game implements Runnable {
                     last_bounty_hunter_bot.makeChecks = false;
                 }
                 isGameRunning = false;
-                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Updated Bounty Available for Hunters to Grab : " + prizePool,
+                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Updated Bounty Available for Hunters to Grab : " + getPrizePool(),
                         51, null);
 
                 checkForStatus(51);
@@ -554,15 +554,23 @@ public class Game implements Runnable {
         }
     }
 
-    private void addRTKToPot(BigInteger amount, String sender) {
+    public void addRTKToPot(BigInteger amount, String sender) {
         if (!sender.equalsIgnoreCase(last_bounty_hunter_bot.topUpWalletAddress)) {
             netCurrentPool = netCurrentPool.add(amount);
             prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
         }
     }
 
+    public void sendBountyUpdateMessage(BigInteger amount) {
+        last_bounty_hunter_bot.sendMessage(chat_id, "Bounty Increased...Game Host added " + getPrizePool(amount) + " to the current Bounty");
+    }
+
     private String getPrizePool() {
         return new BigDecimal(prizePool).divide(new BigDecimal(decimals), 3, RoundingMode.HALF_EVEN).toString() + " RTK";
+    }
+
+    private String getPrizePool(BigInteger amount) {
+        return new BigDecimal(amount).divide(new BigDecimal(decimals), 3, RoundingMode.HALF_EVEN).toString() + " RTK";
     }
 
     public Instant getCurrentRoundEndTime() {
