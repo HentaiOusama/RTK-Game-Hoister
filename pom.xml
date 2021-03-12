@@ -6,7 +6,7 @@
 
     <groupId>org.hentai_productions</groupId>
     <artifactId>last-bounty-hunter-bot</artifactId>
-    <version>5</version>
+    <version>5.0</version>
 
     <properties>
         <maven.compiler.source>15.0.1</maven.compiler.source>
@@ -74,6 +74,7 @@
                     <appName>last-bounty-hunter-bot</appName>
                     <includes>
                         <include>PreservedState.bps</include>
+                        <include>CustomLogsOutput.txt</include>
                     </includes>
                     <processTypes>
                         <worker>sh target/bin/worker</worker>

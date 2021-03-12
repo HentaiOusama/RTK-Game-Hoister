@@ -47,7 +47,7 @@ public class Game implements Runnable {
                 try {
                     finalLatestBlockNumber = web3j[4].ethBlockNumber().send().getBlockNumber();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                 }
             }
         }
@@ -65,17 +65,17 @@ public class Game implements Runnable {
                                 disposable[i].dispose();
                             }
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                         }
                         try {
                             web3j[i].shutdown();
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                         }
                         try {
                             webSocketService[i].close();
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                         }
                     }
                 }
@@ -89,7 +89,7 @@ public class Game implements Runnable {
                         connectionCount = 0;
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                 }
             }
         }
@@ -527,7 +527,7 @@ public class Game implements Runnable {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
             last_bounty_hunter_bot.sendMessage(chat_id, "The bot encountered Fatal Error.\nReference : " + e.getMessage() +
                     "\n\nPlease Contact @OreGaZembuTouchiSuru");
         }
@@ -544,7 +544,7 @@ public class Game implements Runnable {
         try {
             Thread.sleep((long) (seconds * 1000));
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
         }
     }
 
@@ -562,7 +562,8 @@ public class Game implements Runnable {
     }
 
     public void sendBountyUpdateMessage(BigInteger amount) {
-        last_bounty_hunter_bot.sendMessage(chat_id, "Bounty Increased...Game Host added " + getPrizePool(amount) + " to the current Bounty");
+        last_bounty_hunter_bot.sendMessage(chat_id, "Bounty Increased...Game Host added " + getPrizePool(amount.divide(BigInteger.valueOf(2)))
+                + " to the current Bounty");
     }
 
     private String getPrizePool() {
@@ -590,28 +591,28 @@ public class Game implements Runnable {
         }
         hasGameClosed = true;
         last_bounty_hunter_bot.sendMessage(chat_id, "The bot has been shut down. Please don't send any transactions now.");
-        performProperWait(1);
         for (int i = 0; i < 5; i++) {
-            System.out.println("XXXXX\nXXXXX\nGetGameDeletedDisposer - i : " + i + "\nXXXXX\nXXXXX");
+            last_bounty_hunter_bot.logsPrintStream.println("XXXXX\nXXXXX\nGetGameDeletedDisposer - i : " + i + "\nXXXXX\nXXXXX");
             try {
                 if (!disposable[i].isDisposed()) {
                     disposable[i].dispose();
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
             }
             try {
                 web3j[i].shutdown();
             } catch (Exception e) {
-                e.printStackTrace();
+                e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
             }
             try {
                 webSocketService[i].close();
             } catch (Exception e) {
-                e.printStackTrace();
+                e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
             }
         }
-        System.out.println("Game Closed...");
+        last_bounty_hunter_bot.decreaseUndisposedGameCount();
+        last_bounty_hunter_bot.logsPrintStream.println("Game Closed...");
     }
 
     public void setShouldContinueGame(boolean shouldContinueGame) {
@@ -620,6 +621,7 @@ public class Game implements Runnable {
 
 
     // Related to Blockchain Communication
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private boolean buildCustomBlockchainReader(boolean shouldSendMessage) {
 
         int count = 0;
@@ -627,28 +629,30 @@ public class Game implements Runnable {
             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Connecting to Blockchain Network to read transactions. Please be patient. " +
                     "This can take from few seconds to few minutes", 1, null);
         }
-        System.out.println("Connecting to Web3");
+        last_bounty_hunter_bot.logsPrintStream.println("Connecting to Web3");
         shouldTryToEstablishConnection = true;
         while (shouldTryToEstablishConnection && count < 2) {
             count++;
-            for (int i = 0; i < 5; i++) {
-                System.out.println("XXXXX\nXXXXX\nDisposer Before Re-ConnectionBuilder - i : " + i + "\nXXXXX\nXXXXX");
-                try {
-                    if (!disposable[i].isDisposed()) {
-                        disposable[i].dispose();
+            if(count == 1) {
+                for (int i = 0; i < 5; i++) {
+                    last_bounty_hunter_bot.logsPrintStream.println("XXXXX\nXXXXX\nDisposer Before Re-ConnectionBuilder - i : " + i + "\nXXXXX\nXXXXX");
+                    try {
+                        if (!disposable[i].isDisposed()) {
+                            disposable[i].dispose();
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                try {
-                    web3j[i].shutdown();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                try {
-                    webSocketService[i].close();
-                } catch (Exception e) {
-                    e.printStackTrace();
+                    try {
+                        web3j[i].shutdown();
+                    } catch (Exception e) {
+                        e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
+                    }
+                    try {
+                        webSocketService[i].close();
+                    } catch (Exception e) {
+                        e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
+                    }
                 }
             }
             Collections.shuffle(webSocketUrls);
@@ -659,7 +663,8 @@ public class Game implements Runnable {
                         @Override
                         public void onClose(int code, String reason, boolean remote) {
                             super.onClose(code, reason, remote);
-                            logger.info(chat_id + " : WebSocket connection to " + uri + " closed successfully " + reason + ", With i = " + finalI);
+                            logger.info("(onClose) : " + chat_id + " : WebSocket connection to " + uri + " closed successfully " + reason +
+                                    ", With i = " + finalI);
                             setShouldTryToEstablishConnection();
                         }
 
@@ -667,8 +672,9 @@ public class Game implements Runnable {
                         public void onError(Exception e) {
                             super.onError(e);
                             setShouldTryToEstablishConnection();
-                            logger.error("XXXXX\nXXXXX\n" + chat_id + " : WebSocket connection to " + uri + " failed.... \nClass : Game.java\nLine No. : " +
-                                    e.getStackTrace()[0].getLineNumber() + "\nTrying For Reconnect...- i : " + finalI + "\nXXXXX\nXXXXX");
+                            logger.error("XXXXX\nXXXXX\n" + "(onError) : " + chat_id + " : WebSocket connection to " + uri + " failed.... \n" +
+                                    "Class : Game.java\nLine No. : " + e.getStackTrace()[0].getLineNumber() + "\nTrying For Reconnect...- i : "
+                                    + finalI + "\nXXXXX\nXXXXX");
                         }
                     };
                     webSocketService[i] = new WebSocketService(webSocketClient, true);
@@ -676,7 +682,7 @@ public class Game implements Runnable {
                 }
                 shouldTryToEstablishConnection = false;
             } catch (Exception e) {
-                e.printStackTrace();
+                e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
             }
             performProperWait(2);
         }
@@ -684,13 +690,13 @@ public class Game implements Runnable {
         try {
             for(int i = 0; i < 5; i++) {
                 web3j[i] = Web3j.build(webSocketService[i]);
-                System.out.println("\n\n\nGame's Chat ID : " + chat_id + "\nWeb3ClientVersion[" + i + "] : "
+                last_bounty_hunter_bot.logsPrintStream.println("\n\n\nGame's Chat ID : " + chat_id + "\nWeb3ClientVersion[" + i + "] : "
                         + web3j[i].web3ClientVersion().send().getWeb3ClientVersion());
             }
 
             EthFilter[] RTKContractFilter = new EthFilter[5];
             for (int i = 0; i < 5; i++) {
-                System.out.println("Last Checked Block Number : " + lastCheckedTransactionData.blockNumber);
+                last_bounty_hunter_bot.logsPrintStream.println("Last Checked Block Number : " + lastCheckedTransactionData.blockNumber);
                 RTKContractFilter[i] = new EthFilter(new DefaultBlockParameterNumber(lastCheckedTransactionData.blockNumber),
                         DefaultBlockParameterName.LATEST, RTKContractAddresses[i]);
                 int finalI = i;
@@ -701,26 +707,26 @@ public class Game implements Runnable {
                         if (trx.isPresent()) {
                             TransactionData currentTrxData = splitInputData(log, trx.get());
                             currentTrxData.X = finalI + 1;
-                            System.out.print("Chat ID : " + chat_id + " ===>> " + currentTrxData + ", Was Counted = ");
+                            last_bounty_hunter_bot.logsPrintStream.print("Chat ID : " + chat_id + " ===>> " + currentTrxData + ", Was Counted = ");
                             if (!currentTrxData.methodName.equals("Useless") && currentTrxData.toAddress.equalsIgnoreCase(shotWallet)
                                     && currentTrxData.value.compareTo(shotCost) >= 0 && currentTrxData.compareTo(lastCheckedTransactionData) > 0) {
                                 validTransactions.add(currentTrxData);
-                                System.out.println("Yes");
+                                last_bounty_hunter_bot.logsPrintStream.println("Yes");
                             } else {
-                                System.out.println("No");
+                                last_bounty_hunter_bot.logsPrintStream.println("No");
                             }
                         }
                     }
                     prevHash[finalI] = hash;
                 }, throwable -> {
-                    throwable.printStackTrace();
+                    throwable.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                     webSocketService[finalI].close();
                     webSocketService[finalI].connect();
                 });
             }
-            System.out.println("\n\n\n");
+            last_bounty_hunter_bot.logsPrintStream.println("\n\n\n");
         } catch (IOException e) {
-            e.printStackTrace();
+            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
             return true;
         }
         return !shouldTryToEstablishConnection;
@@ -764,14 +770,14 @@ public class Game implements Runnable {
             gasPrice = web3j[4].ethGasPrice().send().getGasPrice();
             BigInteger balance = web3j[4].ethGetBalance(shotWallet, DefaultBlockParameterName.LATEST).send().getBalance();
             minGasFees = gasPrice.multiply(new BigInteger("195000"));
-            System.out.println("Network type = " + EthNetworkType + ", Wallet Balance = " + balance + ", Required Balance = " + minGasFees +
+            last_bounty_hunter_bot.logsPrintStream.println("Network type = " + EthNetworkType + ", Wallet Balance = " + balance + ", Required Balance = " + minGasFees +
                     ", gasPrice = " + gasPrice);
             rewardWalletBalance = new BigDecimal(balance).divide(new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN);
             if (balance.compareTo(minGasFees) > 0) {
                 retVal = true;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
         }
         return !retVal;
     }
@@ -800,11 +806,11 @@ public class Game implements Runnable {
                             return BigInteger.valueOf(65000L);
                         }
                     }).transfer(toAddress, amount).sendAsync().get();
-            System.out.println(trxReceipt.getTransactionHash());
+            last_bounty_hunter_bot.logsPrintStream.println(trxReceipt.getTransactionHash());
             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Reward is being sent. Trx id :- " + trxReceipt.getTransactionHash() +
                     "\n\n\nCode by : @OreGaZembuTouchiSuru", 50, null);
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
         }
     }
 
@@ -826,10 +832,10 @@ public class Game implements Runnable {
                 @Override
                 public void onError(Exception e) {
                     super.onError(e);
-                    e.printStackTrace();
+                    e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                     setShouldTryToEstablishConnection();
                     logger.error(chat_id + " : WebSocket connection to " + uri + " failed with error");
-                    System.out.println("Trying again");
+                    last_bounty_hunter_bot.logsPrintStream.println("Trying again");
                 }
             };
             webSocketService[0] = new WebSocketService(webSocketClient, true);
@@ -854,7 +860,7 @@ public class Game implements Runnable {
             webSocketService[0].close();
             return finalValue;
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
             return null;
         }
     }
