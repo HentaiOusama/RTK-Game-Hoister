@@ -99,7 +99,7 @@ public class Game implements Runnable {
     // Managing Variables
     Logger logger = Logger.getLogger(Game.class);
     private final Last_Bounty_Hunter_Bot last_bounty_hunter_bot;
-    private final long chat_id;
+    private final String chat_id;
     public volatile boolean isGameRunning = false, shouldContinueGame = true, didSomeoneGotShot = false, hasGameClosed = false;
     private volatile Instant currentRoundEndTime = null;
     private volatile BigInteger finalLatestBlockNumber = null;
@@ -126,7 +126,7 @@ public class Game implements Runnable {
 
     // Constructor
     @SuppressWarnings("SpellCheckingInspection")
-    Game(Last_Bounty_Hunter_Bot last_bounty_hunter_bot, long chat_id, String EthNetworkType, String shotWallet, String[] RTKContractAddresses,
+    Game(Last_Bounty_Hunter_Bot last_bounty_hunter_bot, String chat_id, String EthNetworkType, String shotWallet, String[] RTKContractAddresses,
          BigInteger shotCost) {
         this.last_bounty_hunter_bot = last_bounty_hunter_bot;
         this.chat_id = chat_id;
@@ -207,7 +207,7 @@ public class Game implements Runnable {
         int halfValue, quarterValue;
 
         if (!buildCustomBlockchainReader(true)) {
-            last_bounty_hunter_bot.sendMessage(chat_id, "Error encountered while trying to connect to ethereum network. Cancelling the" +
+            last_bounty_hunter_bot.sendMessage(chat_id, "Error encountered while trying to connect to ethereum network. Cancelling the " +
                     "game.");
 
             getCurrentGameDeleted();
@@ -220,7 +220,7 @@ public class Game implements Runnable {
                                                         
                             Minimum eth required : %s. Actual Balance = %s
                                                         
-                            The bot will not read any transactions till the balances is updated by admins.""", shotWallet,
+                            The bot will not read any transactions till the balances are updated by admins.""", shotWallet,
                     new BigDecimal(minGasFees).divide(new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN), rewardWalletBalance));
             getCurrentGameDeleted();
             return;
@@ -252,7 +252,7 @@ public class Game implements Runnable {
                 }
                 Collections.sort(transactionsUnderReview);
 
-                long mainRuletkaChatID = -1001303208172L;
+                String mainRuletkaChatID = "-1001303208172";
                 while (transactionsUnderReview.size() > 0 && !didSomeoneGotShot) {
                     transactionData = transactionsUnderReview.remove(0);
                     lastCheckedTransactionData = transactionData;
@@ -690,13 +690,14 @@ public class Game implements Runnable {
         try {
             for(int i = 0; i < 5; i++) {
                 web3j[i] = Web3j.build(webSocketService[i]);
-                last_bounty_hunter_bot.logsPrintStream.println("\n\n\nGame's Chat ID : " + chat_id + "\nWeb3ClientVersion[" + i + "] : "
+                last_bounty_hunter_bot.logsPrintStream.println("Game's Chat ID : " + chat_id + "\nWeb3ClientVersion[" + i + "] : "
                         + web3j[i].web3ClientVersion().send().getWeb3ClientVersion());
             }
 
             EthFilter[] RTKContractFilter = new EthFilter[5];
             for (int i = 0; i < 5; i++) {
-                last_bounty_hunter_bot.logsPrintStream.println("Last Checked Block Number : " + lastCheckedTransactionData.blockNumber);
+                last_bounty_hunter_bot.logsPrintStream.println("Building Filter Number : " + i +
+                        "\nLast Checked Block Number : " + lastCheckedTransactionData.blockNumber);
                 RTKContractFilter[i] = new EthFilter(new DefaultBlockParameterNumber(lastCheckedTransactionData.blockNumber),
                         DefaultBlockParameterName.LATEST, RTKContractAddresses[i]);
                 int finalI = i;
@@ -724,7 +725,7 @@ public class Game implements Runnable {
                     webSocketService[finalI].connect();
                 });
             }
-            last_bounty_hunter_bot.logsPrintStream.println("\n\n\n");
+            last_bounty_hunter_bot.logsPrintStream.println("\n\n");
         } catch (IOException e) {
             e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
             return true;

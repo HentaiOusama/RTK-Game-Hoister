@@ -1,6 +1,6 @@
 import org.apache.log4j.BasicConfigurator;
-import org.telegram.telegrambots.ApiContextInitializer;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
+import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -41,17 +41,12 @@ public class MainClass {
         System.setProperty("com.google.inject.internal.cglib.$experimental_asm7", "true");
 
         // Starting Telegram bot and Web3 services
-        initialize();
-        TelegramBotsApi telegramBotsApi = new TelegramBotsApi();
         try {
+            TelegramBotsApi telegramBotsApi = new TelegramBotsApi(DefaultBotSession.class);
             telegramBotsApi.registerBot(new Last_Bounty_Hunter_Bot(shotWallet));
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    public static void initialize() {
-        ApiContextInitializer.init();
     }
 
     @SuppressWarnings("unchecked")
