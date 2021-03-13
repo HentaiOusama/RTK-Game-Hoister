@@ -159,6 +159,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                         e.printStackTrace(logsPrintStream);
                     }
                 }
+                sendLogs(allAdmins.get(0).toString());
                 logsPrintStream.println("\n...Graceful Shutddown Successful...\n");
                 logsPrintStream.flush();
                 logsPrintStream.close();
