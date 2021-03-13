@@ -18,6 +18,7 @@ import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.core.methods.response.Transaction;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.websocket.WebSocketClient;
+import org.web3j.protocol.websocket.WebSocketService;
 import org.web3j.tx.gas.ContractGasProvider;
 
 import java.io.IOException;
@@ -92,13 +93,13 @@ public class Game implements Runnable {
 
     // Managing Variables
     Logger logger = Logger.getLogger(Game.class);
+    volatile boolean isGameRunning = false, shouldContinueGame = true, didSomeoneGotShot = false, hasGameClosed = false;
+    volatile TransactionData lastCheckedTransactionData = null;
+    volatile boolean shouldRecoverFromAbruptInterruption = false;
     private final Last_Bounty_Hunter_Bot last_bounty_hunter_bot;
     private final String chat_id;
-    public volatile boolean isGameRunning = false, shouldContinueGame = true, didSomeoneGotShot = false, hasGameClosed = false;
     private volatile Instant currentRoundEndTime = null;
     private volatile BigInteger finalLatestBlockNumber = null;
-    public volatile TransactionData lastCheckedTransactionData = null;
-    public volatile boolean shouldRecoverFromAbruptInterruption = false;
     private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     private final ScheduledExecutorService scheduledExecutorService2 = Executors.newSingleThreadScheduledExecutor();
     private int connectionCount = 0;
@@ -110,7 +111,6 @@ public class Game implements Runnable {
     private final BigInteger shotCost, decimals = new BigInteger("1000000000000000000");
     private final List<String> RTKContractAddresses;
     private String prevHash;
-    private final ArrayList<String> webSocketUrls = new ArrayList<>();
     private WebSocketService webSocketService; // Custom WebSocketService Used. (Do not Import Web3j....WebSocketService)
     private Web3j web3j;
     private Disposable disposable;
@@ -120,7 +120,6 @@ public class Game implements Runnable {
     private BigInteger gasPrice, minGasFees, netCurrentPool = BigInteger.valueOf(0), prizePool = BigInteger.valueOf(0);
 
     // Constructor
-    @SuppressWarnings("SpellCheckingInspection")
     Game(Last_Bounty_Hunter_Bot last_bounty_hunter_bot, String chat_id, String EthNetworkType, String shotWallet, String[] RTKContractAddresses,
          BigInteger shotCost) {
         this.last_bounty_hunter_bot = last_bounty_hunter_bot;
@@ -132,32 +131,7 @@ public class Game implements Runnable {
         }
         this.RTKContractAddresses = Arrays.asList(RTKContractAddresses);
         this.shotCost = shotCost;
-
         shouldSendNotificationToMainRTKChat = EthNetworkType.toLowerCase().contains("mainnet");
-
-        ///// Setting web3 data
-        // Connecting to web3 client
-        if(EthNetworkType.startsWith("matic")) {
-            String val = EthNetworkType.substring(5).toLowerCase();
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/56aa369ae7fd09b65b52f932d7410d38ba287d07");
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/3b0b0d6046e7da8da765b05296085f8c97753c61");
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/d02da2509d64cf806714e1ddcd54e4c179c13d4e");
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/a149b4ed97ba55c6edad87c488229015d3d7124a");
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/b59593f7317289035dee5b626e6d3d6dd95c4c91");
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/d8fdfd183f6bc45dd2ad4809f22687b29ca4b85c");
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/c2f20b22705f9c45d1337380a28d6613e08310d6");
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/94ef8862aaa7f832ca421d4e01da3fb5a5313969");
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/e247aacac4d9d2cc83a8e81cd51c3ec36a2f5a93");
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/eee88d447ebc33a64f5acf891270517ff506330b");
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/d2b3d15442e3631d4a11324eda64d05a6404a2e8");
-        } else {
-            webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/04009a10020d420bbab54951e72e23fd");
-            webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/94fead43844d49de833adffdf9ff3993");
-            webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/b8440ab5890a4d539293994119b36893");
-            webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/b05a1fe6f7b64750a10372b74dec074f");
-            webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/2e98f2588f85423aa7bced2687b8c2af");
-        }
-        /////
     }
 
     @Override
@@ -648,9 +622,20 @@ public class Game implements Runnable {
                     e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                 }
             }
+            ArrayList<String> webSocketUrls;
+            String prefix, middleTerm;
+            if(EthNetworkType.startsWith("matic")) {
+                webSocketUrls = last_bounty_hunter_bot.maticWebSocketUrls;
+                prefix = last_bounty_hunter_bot.maticPrefix;
+                middleTerm = EthNetworkType.toLowerCase().substring(5);
+            } else {
+                webSocketUrls = last_bounty_hunter_bot.etherWebSocketUrls;
+                prefix = last_bounty_hunter_bot.etherPrefix;
+                middleTerm = EthNetworkType;
+            }
             Collections.shuffle(webSocketUrls);
             try {
-                WebSocketClient webSocketClient = new WebSocketClient(new URI(webSocketUrls.get(0))) {
+                WebSocketClient webSocketClient = new WebSocketClient(new URI(prefix + middleTerm + webSocketUrls.get(0))) {
                     @Override
                     public void onClose(int code, String reason, boolean remote) {
                         super.onClose(code, reason, remote);
@@ -667,7 +652,7 @@ public class Game implements Runnable {
                     }
                 };
                 webSocketService = new WebSocketService(webSocketClient, true);
-                last_bounty_hunter_bot.logsPrintStream.println("Connect Url : " + webSocketUrls.get(0));
+                last_bounty_hunter_bot.logsPrintStream.println("Connect Url : " + prefix + middleTerm + webSocketUrls.get(0));
                 webSocketService.connect();
                 shouldTryToEstablishConnection = false;
             } catch (Exception e) {
@@ -805,26 +790,37 @@ public class Game implements Runnable {
     // Not yet complete. This has to be changed and replace with a checker for minimum balance of RTK.
     private BigInteger getNetRTKWalletBalance() {
         try {
+            ArrayList<String> webSocketUrls;
+            String prefix, middleTerm;
+            if(EthNetworkType.startsWith("matic")) {
+                webSocketUrls = last_bounty_hunter_bot.maticWebSocketUrls;
+                prefix = last_bounty_hunter_bot.maticPrefix;
+                middleTerm = EthNetworkType.toLowerCase().substring(5);
+            } else {
+                webSocketUrls = last_bounty_hunter_bot.etherWebSocketUrls;
+                prefix = last_bounty_hunter_bot.etherPrefix;
+                middleTerm = EthNetworkType;
+            }
             Collections.shuffle(webSocketUrls);
-            WebSocketClient webSocketClient = new WebSocketClient(new URI(webSocketUrls.get(0))) {
+            WebSocketClient webSocketClient = new WebSocketClient(new URI(prefix + middleTerm + webSocketUrls.get(0))) {
                 @Override
                 public void onClose(int code, String reason, boolean remote) {
                     super.onClose(code, reason, remote);
-                    logger.info(chat_id + " : WebSocket connection to " + uri + " closed successfully " + reason);
+                    logger.info("(onClose) : " + chat_id + " : WebSocket connection to " + uri + " closed successfully " + reason);
+                    setShouldTryToEstablishConnection();
                 }
 
                 @Override
                 public void onError(Exception e) {
                     super.onError(e);
-                    e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                     setShouldTryToEstablishConnection();
-                    logger.error(chat_id + " : WebSocket connection to " + uri + " failed with error");
-                    last_bounty_hunter_bot.logsPrintStream.println("Trying again");
+                    logger.error("XXXXX\nXXXXX\n" + "(onError) : " + chat_id + " : WebSocket connection to " + uri + " failed.... \n" +
+                            "Class : Game.java\nLine No. : " + e.getStackTrace()[0].getLineNumber() + "\nTrying For Reconnect...\nXXXXX\nXXXXX");
                 }
             };
-            webSocketService = new WebSocketService(webSocketClient, true);
+            WebSocketService webSocketService = new WebSocketService(webSocketClient, true);
             webSocketService.connect();
-            web3j = Web3j.build(webSocketService);
+            Web3j web3j = Web3j.build(webSocketService);
             BigInteger finalValue = new BigInteger("0");
             for (int i = 0; i < 5; i++) {
                 Function function = new Function("balanceOf",

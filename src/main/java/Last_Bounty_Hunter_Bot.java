@@ -101,21 +101,26 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     // Game manager variable
     private boolean shouldRunGame;
     private ArrayList<Long> allAdmins = new ArrayList<>();
-    public volatile String topUpWalletAddress;
     private final String testingChatId = "-1001477389485", actualGameChatId = "-1001275436629", mainRuletkaChatID = "-1001303208172";
-    public volatile boolean makeChecks = false;
-    public volatile TransactionData lastSavedStateTransactionData = null;
-    public volatile int lastSendStatus = -1;
     private boolean shouldAllowMessageFlow = true;
-    public FileOutputStream fileOutputStream;
-    public PrintStream logsPrintStream;
-    public int undisposedGameCount = 0;
+    volatile String topUpWalletAddress;
+    volatile boolean makeChecks = false;
+    volatile TransactionData lastSavedStateTransactionData = null;
+    volatile int lastSendStatus = -1;
+    FileOutputStream fileOutputStream;
+    PrintStream logsPrintStream;
+    int undisposedGameCount = 0;
 
     // Blockchain Related Stuff
     private String EthNetworkType;
     private final String shotWallet;
     private String[] RTKContractAddresses;
     private BigInteger shotCost;
+    String maticPrefix;
+    String etherPrefix;
+    ArrayList<String> maticWebSocketUrls = new ArrayList<>();
+    ArrayList<String> etherWebSocketUrls = new ArrayList<>();
+    
 
     // MongoDB Related Stuff
     private final String botName = "Last Bounty Hunter Bot";
@@ -201,6 +206,23 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         shouldRunGame = (boolean) foundBotNameDoc.get("shouldRunGame");
         this.EthNetworkType = (String) foundBotNameDoc.get("EthNetworkType");
         this.shotCost = new BigInteger((String) foundBotNameDoc.get("shotCost"));
+        int maticCount = Integer.parseInt(((String) foundBotNameDoc.get("urlCounts")).trim().split(" ")[0]);
+        if (foundBotNameDoc.get("urlList") instanceof List) {
+            for (int i = 0; i < (((List<?>) foundBotNameDoc.get("urlList")).size()); i++) {
+                Object item = ((List<?>) foundBotNameDoc.get("urlList")).get(i);
+                if (item instanceof String) {
+                    if(i == 0) {
+                        maticPrefix = (String) item;
+                    } else if(i == 1) {
+                        etherPrefix = (String) item;
+                    } else if(i < maticCount + 2) {
+                        maticWebSocketUrls.add((String) item);
+                    } else {
+                        etherWebSocketUrls.add((String) item);
+                    }
+                }
+            }
+        }
 
         switch (EthNetworkType) {
             case "mainnet" -> RTKContractAddresses = new String[]{"0x1F6DEADcb526c4710Cf941872b86dcdfBbBD9211",
@@ -406,6 +428,30 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     }
                 }
             }
+            else if (text.equalsIgnoreCase("rebuildWebSocketUrls")) {
+                Document botNameDoc = new Document("botName", botName);
+                Document foundBotNameDoc = (Document) walletDistributionCollection.find(botNameDoc).first();
+                assert foundBotNameDoc != null;
+                int maticCount = Integer.parseInt(((String) foundBotNameDoc.get("urlCounts")).trim().split(" ")[0]);
+                maticWebSocketUrls = new ArrayList<>();
+                etherWebSocketUrls = new ArrayList<>();
+                if (foundBotNameDoc.get("urlList") instanceof List) {
+                    for (int i = 0; i < (((List<?>) foundBotNameDoc.get("urlList")).size()); i++) {
+                        Object item = ((List<?>) foundBotNameDoc.get("urlList")).get(i);
+                        if (item instanceof String) {
+                            if(i == 0) {
+                                maticPrefix = (String) item;
+                            } else if(i == 1) {
+                                etherPrefix = (String) item;
+                            } else if(i < maticCount + 2) {
+                                maticWebSocketUrls.add((String) item);
+                            } else {
+                                etherWebSocketUrls.add((String) item);
+                            }
+                        }
+                    }
+                }
+            }
             else if (text.toLowerCase().startsWith("settopupwallet")) {
                 try {
                     Document document = new Document("identifier", "adminDetails");
@@ -462,6 +508,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                                 amountPulledOutFromFeesBalance amount
                                 getFeesBalance
                                 rebuildAdmins
+                                rebuildWebSocketUrls
                                 setTopUpWallet walletAddress
                                 resetWebSocketConnection
                                 setMessageFlow to boolean

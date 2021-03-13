@@ -12,10 +12,10 @@ import java.lang.reflect.Method;
 
 /*Required Environment Variables :-
  *
- * DeadlineChaserBotTokenA      = ?????;
- * DeadlineChaserBotTokenB      = ?????;
- * hellGatesMonoID              = ?????;
- * hellGatesMonoPass            = ?????;
+ * lastBountyHunterBotTokenA    = ?????;
+ * lastBountyHunterBotTokenB    = ?????;
+ * lastBountyHunterMonoID       = ?????;
+ * lastBountyHunterMonoPass     = ?????;
  * PrivateKey                   = ?????;
  * PublicKey                    = ?????;
  * */
