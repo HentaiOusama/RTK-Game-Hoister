@@ -600,9 +600,13 @@ public class Game implements Runnable {
         }
         last_bounty_hunter_bot.logsPrintStream.println("Connecting to Web3");
         shouldTryToEstablishConnection = true;
+
+
+        // Url + WebSocketClient + WebSocketService  <--- Build + Connect
         while (shouldTryToEstablishConnection && count < 2) {
-            count++;
-            if(count == 1) {
+
+            // Pre Disposer
+            if(count != 0) {
                 last_bounty_hunter_bot.logsPrintStream.println("XXXXX\nXXXXX\nDisposer Before Re-ConnectionBuilder\nXXXXX\nXXXXX");
                 try {
                     if (!disposable.isDisposed()) {
@@ -622,81 +626,103 @@ public class Game implements Runnable {
                     e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                 }
             }
+            count++;
+
+            // Building Urls, WebSocketClient and WebSocketService
             ArrayList<String> webSocketUrls;
-            String prefix, middleTerm;
+            String prefix, infix;
             if(EthNetworkType.startsWith("matic")) {
                 webSocketUrls = last_bounty_hunter_bot.maticWebSocketUrls;
                 prefix = last_bounty_hunter_bot.maticPrefix;
-                middleTerm = EthNetworkType.toLowerCase().substring(5);
+                infix = EthNetworkType.toLowerCase().substring(5);
             } else {
                 webSocketUrls = last_bounty_hunter_bot.etherWebSocketUrls;
                 prefix = last_bounty_hunter_bot.etherPrefix;
-                middleTerm = EthNetworkType;
+                infix = EthNetworkType;
             }
             Collections.shuffle(webSocketUrls);
+            URI uri = null;
             try {
-                WebSocketClient webSocketClient = new WebSocketClient(new URI(prefix + middleTerm + webSocketUrls.get(0))) {
-                    @Override
-                    public void onClose(int code, String reason, boolean remote) {
-                        super.onClose(code, reason, remote);
-                        logger.info("(onClose) : " + chat_id + " : WebSocket connection to " + uri + " closed successfully " + reason);
-                        setShouldTryToEstablishConnection();
-                    }
-
-                    @Override
-                    public void onError(Exception e) {
-                        super.onError(e);
-                        setShouldTryToEstablishConnection();
-                        logger.error("XXXXX\nXXXXX\n" + "(onError) : " + chat_id + " : WebSocket connection to " + uri + " failed.... \n" +
-                                "Class : Game.java\nLine No. : " + e.getStackTrace()[0].getLineNumber() + "\nTrying For Reconnect...\nXXXXX\nXXXXX");
-                    }
-                };
-                webSocketService = new WebSocketService(webSocketClient, true);
-                last_bounty_hunter_bot.logsPrintStream.println("Connect Url : " + prefix + middleTerm + webSocketUrls.get(0));
-                webSocketService.connect();
-                shouldTryToEstablishConnection = false;
+                uri = new URI(prefix + infix + webSocketUrls.get(0));
             } catch (Exception e) {
                 e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
             }
+            assert uri != null;
+            WebSocketClient webSocketClient = new WebSocketClient(uri) {
+                @Override
+                public void onClose(int code, String reason, boolean remote) {
+                    super.onClose(code, reason, remote);
+                    logger.info("(onClose) : " + chat_id + " : WebSocket connection to " + uri + " closed successfully " + reason);
+                    setShouldTryToEstablishConnection();
+                }
+
+                @Override
+                public void onError(Exception e) {
+                    super.onError(e);
+                    setShouldTryToEstablishConnection();
+                    logger.error("XXXXX\nXXXXX\n" + "(onError) : " + chat_id + " : WebSocket connection to " + uri + " failed.... \n" +
+                            "Class : Game.java\nLine No. : " + e.getStackTrace()[0].getLineNumber() + "\nTrying For Reconnect...\nXXXXX\nXXXXX");
+                }
+            };
+            webSocketService = new WebSocketService(webSocketClient, true);
+            last_bounty_hunter_bot.logsPrintStream.println("Connect Url : " + prefix + infix + webSocketUrls.get(0));
+
+
+            // Connecting to WebSocket
+            try {
+                webSocketService.connect();
+                shouldTryToEstablishConnection = false;
+            } catch (Exception e) {
+                last_bounty_hunter_bot.logsPrintStream.println("External Error While Connect to WebSocketService... Entered Catch Block");
+                e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
+                setShouldTryToEstablishConnection();
+            }
+
+
             performProperWait(2);
         }
 
+
+        // Building Web3j over Connected WebSocketService
+        web3j = Web3j.build(webSocketService);
         try {
-            web3j = Web3j.build(webSocketService);
             last_bounty_hunter_bot.logsPrintStream.println("Game's Chat ID : " + chat_id + "\nWeb3ClientVersion" +
                     web3j.web3ClientVersion().send().getWeb3ClientVersion());
-            EthFilter RTKContractFilter;
-            last_bounty_hunter_bot.logsPrintStream.println("Building Filter\nLast Checked Block Number : " + lastCheckedTransactionData.blockNumber);
-            RTKContractFilter = new EthFilter(new DefaultBlockParameterNumber(lastCheckedTransactionData.blockNumber),
-                    DefaultBlockParameterName.LATEST, RTKContractAddresses);
-            disposable = web3j.ethLogFlowable(RTKContractFilter).subscribe(log -> {
-                String hash = log.getTransactionHash();
-                if ((prevHash == null) || (!prevHash.equalsIgnoreCase(hash))) {
-                    Optional<Transaction> trx = web3j.ethGetTransactionByHash(hash).send().getTransaction();
-                    if (trx.isPresent()) {
-                        TransactionData currentTrxData = splitInputData(log, trx.get());
-                        //currentTrxData.X = finalI + 1;
-                        last_bounty_hunter_bot.logsPrintStream.print("Chat ID : " + chat_id + " ===>> " + currentTrxData + ", Was Counted = ");
-                        if (!currentTrxData.methodName.equals("Useless") && currentTrxData.toAddress.equalsIgnoreCase(shotWallet)
-                                && currentTrxData.value.compareTo(shotCost) >= 0 && currentTrxData.compareTo(lastCheckedTransactionData) > 0) {
-                            validTransactions.add(currentTrxData);
-                            last_bounty_hunter_bot.logsPrintStream.println("Yes");
-                        } else {
-                            last_bounty_hunter_bot.logsPrintStream.println("No");
-                        }
+        } catch (IOException e) {
+            last_bounty_hunter_bot.logsPrintStream.println("Unable to fetch Client Version... In Catch Block");
+            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
+            setShouldTryToEstablishConnection();
+        }
+        EthFilter RTKContractFilter;
+        last_bounty_hunter_bot.logsPrintStream.println("Building Filter\nLast Checked Block Number : " + lastCheckedTransactionData.blockNumber);
+        RTKContractFilter = new EthFilter(new DefaultBlockParameterNumber(lastCheckedTransactionData.blockNumber),
+                DefaultBlockParameterName.LATEST, RTKContractAddresses);
+        disposable = web3j.ethLogFlowable(RTKContractFilter).subscribe(log -> {
+            String hash = log.getTransactionHash();
+            if ((prevHash == null) || (!prevHash.equalsIgnoreCase(hash))) {
+                Optional<Transaction> trx = web3j.ethGetTransactionByHash(hash).send().getTransaction();
+                if (trx.isPresent()) {
+                    TransactionData currentTrxData = splitInputData(log, trx.get());
+                    //currentTrxData.X = finalI + 1;
+                    last_bounty_hunter_bot.logsPrintStream.print("Chat ID : " + chat_id + " ===>> " + currentTrxData + ", Was Counted = ");
+                    if (!currentTrxData.methodName.equals("Useless") && currentTrxData.toAddress.equalsIgnoreCase(shotWallet)
+                            && currentTrxData.value.compareTo(shotCost) >= 0 && currentTrxData.compareTo(lastCheckedTransactionData) > 0) {
+                        validTransactions.add(currentTrxData);
+                        last_bounty_hunter_bot.logsPrintStream.println("Yes");
+                    } else {
+                        last_bounty_hunter_bot.logsPrintStream.println("No");
                     }
                 }
-                prevHash = hash;
-            }, throwable -> {
-                throwable.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
-                webSocketService.close();
-                webSocketService.connect();
-            });
-            last_bounty_hunter_bot.logsPrintStream.println("\n\n");
-        } catch (IOException e) {
-            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
-            return true;
-        }
+            }
+            prevHash = hash;
+        }, throwable -> {
+            last_bounty_hunter_bot.logsPrintStream.println("Disposable Internal Error (Throwable)");
+            throwable.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
+            setShouldTryToEstablishConnection();
+        });
+        last_bounty_hunter_bot.logsPrintStream.println("\n\n");
+
+
         return !shouldTryToEstablishConnection;
     }
 
@@ -746,8 +772,10 @@ public class Game implements Runnable {
                 retVal = true;
             }
         } catch (Exception e) {
+            last_bounty_hunter_bot.logsPrintStream.println("Error when trying to get Wallet Balance");
             e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
         }
+
         return !retVal;
     }
 

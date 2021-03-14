@@ -16,34 +16,37 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.Scanner;
+
 
 public class Web3TestingClass {
     public static String prevHash = null;
     public static Web3j web3j = null;
 
     public static void main(String[] args) {
+
         WebSocketService webSocketService = null;
         Disposable disposable = null;
         String val = "mumbai", EthNetworkType = "ropsten";
         ArrayList<String> webSocketUrls = new ArrayList<>();
         String[] RTKContractAddresses;
         String startBlockNumber;
-
+        // Url Setter and Connect to WebSocket
         if (true) {
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/b59593f7317289035dee5b626e6d3d6dd95c4c91");
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/a149b4ed97ba55c6edad87c488229015d3d7124a");
             webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/871bf83249074ca466951d0e573cae6397033c0a");
             webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/56aa369ae7fd09b65b52f932d7410d38ba287d07");
             webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/3b0b0d6046e7da8da765b05296085f8c97753c61");
             webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/d02da2509d64cf806714e1ddcd54e4c179c13d4e");
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/a149b4ed97ba55c6edad87c488229015d3d7124a");
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/b59593f7317289035dee5b626e6d3d6dd95c4c91");
             webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/d8fdfd183f6bc45dd2ad4809f22687b29ca4b85c");
             webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/c2f20b22705f9c45d1337380a28d6613e08310d6");
             webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/94ef8862aaa7f832ca421d4e01da3fb5a5313969");
             webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/e247aacac4d9d2cc83a8e81cd51c3ec36a2f5a93");
             webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/eee88d447ebc33a64f5acf891270517ff506330b");
             webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/d2b3d15442e3631d4a11324eda64d05a6404a2e8");
-            if(val.equals("mumbai")) {
-                RTKContractAddresses = new String[] {"0x54320152Eb8889a9b28048280001549FAC3E26F5",
+            if (val.equals("mumbai")) {
+                RTKContractAddresses = new String[]{"0x54320152Eb8889a9b28048280001549FAC3E26F5",
                         "0xc21af68636B79A9F12C11740B81558Ad27C038a6", "0x9D27dE8369fc977a3BcD728868984CEb19cF7F66",
                         "0xc21EE7D6eF734dc00B3c535dB658Ef85720948d3", "0x39b892Cf8238736c038B833d88B8C91B1D5C8158"};
             } else {
@@ -51,7 +54,7 @@ public class Web3TestingClass {
                         "0x136A5c9B9965F3827fbB7A9e97E41232Df168B08", "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8",
                         "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d", "0x88dD15CEac31a828e06078c529F5C1ABB214b6E8"};
             }
-            startBlockNumber = "11000000";
+            startBlockNumber = "11461568";
         } else {
             webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/04009a10020d420bbab54951e72e23fd");
             webSocketUrls.add("wss://" + EthNetworkType + ".infura.io/ws/v3/94fead43844d49de833adffdf9ff3993");
@@ -63,8 +66,6 @@ public class Web3TestingClass {
                     "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8", "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d"};
             startBlockNumber = "8000000";
         }
-
-
         System.out.println("Connecting to Web3");
         try {
             WebSocketClient webSocketClient = new WebSocketClient(new URI(webSocketUrls.get(0))) {
@@ -81,24 +82,23 @@ public class Web3TestingClass {
                             + e.getStackTrace()[0].getLineNumber() + "\nXXXXX\nXXXXX");
                 }
             };
-            webSocketService = new WebSocketService(webSocketClient, true) {
-            };
+            webSocketService = new WebSocketService(webSocketClient, true);
             webSocketService.connect();
 
         } catch (Exception e) {
             e.printStackTrace();
         }
 
+
+        EthFilter RTKContractFilter = null;
         try {
             web3j = Web3j.build(webSocketService);
             System.out.println("Web3ClientVersion : " + web3j.web3ClientVersion().send().getWeb3ClientVersion());
             System.out.println("\nLast Checked Block Number : " + startBlockNumber);
             System.out.println("Latest Block Number : " + web3j.ethBlockNumber().send().getBlockNumber());
-            EthFilter RTKContractFilter;
             RTKContractFilter = new EthFilter(new DefaultBlockParameterNumber(Long.parseLong(startBlockNumber)),
                     DefaultBlockParameterName.LATEST, Arrays.asList(RTKContractAddresses));
             //System.out.println("Logs de Gozaru : " + web3j.ethGetLogs(RTKContractFilter).send().getLogs());
-
 
             disposable = web3j.ethLogFlowable(RTKContractFilter).subscribe(log -> {
                 String hash = log.getTransactionHash();
@@ -111,25 +111,60 @@ public class Web3TestingClass {
                     }
                 }
                 prevHash = hash;
-            }, Throwable::printStackTrace);
+            }, throwable -> {
+                System.out.println("Disposal Internal Error");
+                throwable.printStackTrace();
+            });
+            System.out.println("Gas Price : " + web3j.ethGasPrice().send().getGasPrice());
+            System.out.println("Wallet Balance : " + web3j.ethGetBalance("0xdcCF6EE3977903d541B47F31D5bfD3AED3511C62", DefaultBlockParameterName.LATEST).send().getBalance());
             System.out.println("\n");
-        } catch (IOException e) {
+            Thread.sleep(2500);
+        } catch (Exception e) {
+            System.out.println("Disposable Build Error.");
             e.printStackTrace();
         }
+        System.out.println("Disposing....");
+        assert disposable != null;
+        disposable.dispose();
+        while (!disposable.isDisposed()) {
+            System.out.println("Disposable not disposed...");
+            try {
+                Thread.sleep(200);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        web3j.shutdown();
+        assert webSocketService != null;
+        webSocketService.close();
 
+
+        Scanner scanner = new Scanner(System.in);
+        char ip = 'y';
+        while (ip == 'y') {
+            System.out.print("Continue (Y/N)? : ");
+            ip = scanner.nextLine().charAt(0);
+        }
+        System.out.println("End of Main");
+    }
+
+
+
+
+
+
+
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    public static void sleep() {
         try {
             Thread.sleep(2500);
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-        assert disposable != null;
-        disposable.dispose();
-        web3j.shutdown();
-        assert webSocketService != null;
-        webSocketService.close();
     }
-
 
     @SuppressWarnings("SpellCheckingInspection")
     private static TransactionData splitInputData(Log log, Transaction transaction) throws Exception {

@@ -262,6 +262,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         if (update.hasMessage() && isAdmin(update.getMessage().getChatId()) && update.getMessage().hasText()) {
             String chatId = update.getMessage().getChatId().toString();
             String text = update.getMessage().getText();
+            logsPrintStream.println("Incoming Message :\n" + text);
             if (!shouldRunGame && text.equalsIgnoreCase("runBot")) {
                 try {
                     if ((EthNetworkType.equals("mainnet") || EthNetworkType.equals("maticMainnet")) && !currentlyActiveGames.containsKey(actualGameChatId)) {
@@ -539,10 +540,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     @Override
     public <T extends Serializable, Method extends BotApiMethod<T>> T execute(Method method) throws TelegramApiException {
         if(shouldAllowMessageFlow) {
-            if(method instanceof SendMessage) {
-                SendMessage message = (SendMessage) method;
-                logsPrintStream.println("ChatId : " + message.getChatId() + ", Msg : \n" + message.getText());
-            }
             return super.execute(method);
         } else {
             return null;
@@ -552,7 +549,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     @Override
     public Message execute(SendAnimation sendAnimation) throws TelegramApiException {
         if(shouldAllowMessageFlow) {
-            logsPrintStream.println("ChatId : " + sendAnimation.getChatId() + ", Msg : \n" + sendAnimation.getCaption());
             return super.execute(sendAnimation);
         } else {
             return null;
