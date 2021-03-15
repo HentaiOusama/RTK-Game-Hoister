@@ -12,7 +12,7 @@ import org.web3j.protocol.websocket.WebSocketClient;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.net.URI;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Optional;
@@ -27,7 +27,7 @@ public class Web3TestingClass {
 
         WebSocketService webSocketService = null;
         Disposable disposable = null;
-        String val = "mumbai", EthNetworkType = "ropsten";
+        String val = "mainnet", EthNetworkType = "ropsten";
         ArrayList<String> webSocketUrls = new ArrayList<>();
         String[] RTKContractAddresses;
         String startBlockNumber;
@@ -68,6 +68,8 @@ public class Web3TestingClass {
         }
         System.out.println("Connecting to Web3");
         try {
+
+            Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("45.95.99.20", 7580));
             WebSocketClient webSocketClient = new WebSocketClient(new URI(webSocketUrls.get(0))) {
                 @Override
                 public void onClose(int code, String reason, boolean remote) {
@@ -82,9 +84,24 @@ public class Web3TestingClass {
                             + e.getStackTrace()[0].getLineNumber() + "\nXXXXX\nXXXXX");
                 }
             };
+            webSocketClient.setProxy(proxy);
+            final String authUser = System.getenv("proxyUsername");
+            final String authPassword = System.getenv("proxyPassword");
+            Authenticator.setDefault(
+                    new Authenticator() {
+                        @Override
+                        public PasswordAuthentication getPasswordAuthentication() {
+                            return new PasswordAuthentication(authUser, authPassword.toCharArray());
+                        }
+                    }
+            );
+
+            System.setProperty("http.proxyUser", authUser);
+            System.setProperty("http.proxyPassword", authPassword);
+
+            System.setProperty("jdk.http.auth.tunneling.disabledSchemes", "");
             webSocketService = new WebSocketService(webSocketClient, true);
             webSocketService.connect();
-
         } catch (Exception e) {
             e.printStackTrace();
         }

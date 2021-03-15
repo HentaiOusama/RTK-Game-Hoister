@@ -18,7 +18,6 @@ import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.core.methods.response.Transaction;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.websocket.WebSocketClient;
-import org.web3j.protocol.websocket.WebSocketService;
 import org.web3j.tx.gas.ContractGasProvider;
 
 import java.io.IOException;
@@ -26,7 +25,7 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
-import java.net.URI;
+import java.net.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -604,7 +603,7 @@ public class Game implements Runnable {
 
         // Url + WebSocketClient + WebSocketService  <--- Build + Connect
         while (shouldTryToEstablishConnection && count < 2) {
-
+            last_bounty_hunter_bot.logsPrintStream.println("Connecting to Blockchain... Attempt : " + (count + 1));
             // Pre Disposer
             if(count != 0) {
                 last_bounty_hunter_bot.logsPrintStream.println("XXXXX\nXXXXX\nDisposer Before Re-ConnectionBuilder\nXXXXX\nXXXXX");
@@ -664,6 +663,23 @@ public class Game implements Runnable {
                             "Class : Game.java\nLine No. : " + e.getStackTrace()[0].getLineNumber() + "\nTrying For Reconnect...\nXXXXX\nXXXXX");
                 }
             };
+            // Setting up Proxy
+            if(last_bounty_hunter_bot.shouldUseProxy) {
+                ProxyIP proxyIP = last_bounty_hunter_bot.getProxyIP();
+                Authenticator.setDefault(
+                        new Authenticator() {
+                            @Override
+                            public PasswordAuthentication getPasswordAuthentication() {
+                                return new PasswordAuthentication(last_bounty_hunter_bot.proxyUsername,
+                                        last_bounty_hunter_bot.proxyPassword.toCharArray());
+                            }
+                        }
+                );
+                System.setProperty("http.proxyUser", last_bounty_hunter_bot.proxyUsername);
+                System.setProperty("http.proxyPassword", last_bounty_hunter_bot.proxyPassword);
+                System.setProperty("jdk.http.auth.tunneling.disabledSchemes", "");
+                webSocketClient.setProxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyIP.host, proxyIP.port)));
+            }
             webSocketService = new WebSocketService(webSocketClient, true);
             last_bounty_hunter_bot.logsPrintStream.println("Connect Url : " + prefix + infix + webSocketUrls.get(0));
 
@@ -671,6 +687,7 @@ public class Game implements Runnable {
             // Connecting to WebSocket
             try {
                 webSocketService.connect();
+                last_bounty_hunter_bot.logsPrintStream.println("Connection Successful");
                 shouldTryToEstablishConnection = false;
             } catch (Exception e) {
                 last_bounty_hunter_bot.logsPrintStream.println("External Error While Connect to WebSocketService... Entered Catch Block");
@@ -686,7 +703,7 @@ public class Game implements Runnable {
         // Building Web3j over Connected WebSocketService
         web3j = Web3j.build(webSocketService);
         try {
-            last_bounty_hunter_bot.logsPrintStream.println("Game's Chat ID : " + chat_id + "\nWeb3ClientVersion" +
+            last_bounty_hunter_bot.logsPrintStream.println("Game's Chat ID : " + chat_id + "\nWeb3ClientVersion : " +
                     web3j.web3ClientVersion().send().getWeb3ClientVersion());
         } catch (IOException e) {
             last_bounty_hunter_bot.logsPrintStream.println("Unable to fetch Client Version... In Catch Block");
@@ -697,29 +714,38 @@ public class Game implements Runnable {
         last_bounty_hunter_bot.logsPrintStream.println("Building Filter\nLast Checked Block Number : " + lastCheckedTransactionData.blockNumber);
         RTKContractFilter = new EthFilter(new DefaultBlockParameterNumber(lastCheckedTransactionData.blockNumber),
                 DefaultBlockParameterName.LATEST, RTKContractAddresses);
-        disposable = web3j.ethLogFlowable(RTKContractFilter).subscribe(log -> {
-            String hash = log.getTransactionHash();
-            if ((prevHash == null) || (!prevHash.equalsIgnoreCase(hash))) {
-                Optional<Transaction> trx = web3j.ethGetTransactionByHash(hash).send().getTransaction();
-                if (trx.isPresent()) {
-                    TransactionData currentTrxData = splitInputData(log, trx.get());
-                    //currentTrxData.X = finalI + 1;
-                    last_bounty_hunter_bot.logsPrintStream.print("Chat ID : " + chat_id + " ===>> " + currentTrxData + ", Was Counted = ");
-                    if (!currentTrxData.methodName.equals("Useless") && currentTrxData.toAddress.equalsIgnoreCase(shotWallet)
-                            && currentTrxData.value.compareTo(shotCost) >= 0 && currentTrxData.compareTo(lastCheckedTransactionData) > 0) {
-                        validTransactions.add(currentTrxData);
-                        last_bounty_hunter_bot.logsPrintStream.println("Yes");
-                    } else {
-                        last_bounty_hunter_bot.logsPrintStream.println("No");
+        try {
+            disposable = web3j.ethLogFlowable(RTKContractFilter).subscribe(log -> {
+                String hash = log.getTransactionHash();
+                if ((prevHash == null) || (!prevHash.equalsIgnoreCase(hash))) {
+                    Optional<Transaction> trx = web3j.ethGetTransactionByHash(hash).send().getTransaction();
+                    if (trx.isPresent()) {
+                        TransactionData currentTrxData = splitInputData(log, trx.get());
+                        //currentTrxData.X = finalI + 1;
+                        last_bounty_hunter_bot.logsPrintStream.print("Chat ID : " + chat_id + " ===>> " + currentTrxData + ", Was Counted = ");
+                        if (!currentTrxData.methodName.equals("Useless") && currentTrxData.toAddress.equalsIgnoreCase(shotWallet)
+                                && currentTrxData.value.compareTo(shotCost) >= 0 && currentTrxData.compareTo(lastCheckedTransactionData) > 0) {
+                            validTransactions.add(currentTrxData);
+                            last_bounty_hunter_bot.logsPrintStream.println("Yes");
+                        } else {
+                            last_bounty_hunter_bot.logsPrintStream.println("No");
+                        }
                     }
                 }
-            }
-            prevHash = hash;
-        }, throwable -> {
-            last_bounty_hunter_bot.logsPrintStream.println("Disposable Internal Error (Throwable)");
-            throwable.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
+                prevHash = hash;
+            }, throwable -> {
+                last_bounty_hunter_bot.logsPrintStream.println("Disposable Internal Error (Throwable)");
+                throwable.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
+                setShouldTryToEstablishConnection();
+            });
+        } catch (Exception e) {
+            last_bounty_hunter_bot.logsPrintStream.println("Error while creating disposable");
+            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
+        }
+        if(disposable == null) {
             setShouldTryToEstablishConnection();
-        });
+            return false;
+        }
         last_bounty_hunter_bot.logsPrintStream.println("\n\n");
 
 

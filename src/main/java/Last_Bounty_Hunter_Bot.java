@@ -110,6 +110,9 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     FileOutputStream fileOutputStream;
     PrintStream logsPrintStream;
     int undisposedGameCount = 0;
+    final String proxyUsername, proxyPassword;
+    boolean shouldUseProxy = false;
+    private final ArrayList<ProxyIP> allProxies = new ArrayList<>();
 
     // Blockchain Related Stuff
     private String EthNetworkType;
@@ -206,6 +209,16 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         shouldRunGame = (boolean) foundBotNameDoc.get("shouldRunGame");
         this.EthNetworkType = (String) foundBotNameDoc.get("EthNetworkType");
         this.shotCost = new BigInteger((String) foundBotNameDoc.get("shotCost"));
+        proxyUsername = (String) foundBotNameDoc.get("proxyUsername");
+        proxyPassword = (String) foundBotNameDoc.get("proxyPassword");
+        if (foundBotNameDoc.get("proxyIP") instanceof List) {
+            for (int i = 0; i < (((List<?>) foundBotNameDoc.get("proxyIP")).size()); i++) {
+                Object item = ((List<?>) foundBotNameDoc.get("proxyIP")).get(i);
+                if (item instanceof String) {
+                    allProxies.add(new ProxyIP(((String) item).trim().split(":")));
+                }
+            }
+        }
         int maticCount = Integer.parseInt(((String) foundBotNameDoc.get("urlCounts")).trim().split(" ")[0]);
         if (foundBotNameDoc.get("urlList") instanceof List) {
             for (int i = 0; i < (((List<?>) foundBotNameDoc.get("urlList")).size()); i++) {
@@ -223,6 +236,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                 }
             }
         }
+        shouldUseProxy = (boolean) foundBotNameDoc.get("shouldUseProxy");
 
         switch (EthNetworkType) {
             case "mainnet" -> RTKContractAddresses = new String[]{"0x1F6DEADcb526c4710Cf941872b86dcdfBbBD9211",
@@ -487,6 +501,23 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     }
                 }
             }
+            else if (text.toLowerCase().startsWith("setshoulduseproxy to ")) {
+                try {
+                    if (!shouldRunGame && currentlyActiveGames.size() == 0) {
+                        Document botNameDoc = new Document("botName", botName);
+                        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                        assert foundBotNameDoc != null;
+                        shouldUseProxy = Boolean.parseBoolean(text.trim().split(" ")[2]);
+                        Bson updatedAddyDoc = new Document("shouldUseProxy", shouldUseProxy);
+                        Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
+                        botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
+                    } else {
+                        throw new Exception();
+                    }
+                } catch (Exception e) {
+                    sendMessage(chatId, "Either the amount is invalid or there is at least one game that is still running.");
+                }
+            }
             else if (text.equalsIgnoreCase("getLogs")) {
                 sendLogs(chatId);
             }
@@ -513,6 +544,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                                 setTopUpWallet walletAddress
                                 resetWebSocketConnection
                                 setMessageFlow to boolean
+                                setShouldUseProxy to boolean
                                 getLogs
                                 Commands
 
@@ -748,6 +780,11 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         assert foundWalletDetailDoc != null;
         return (String) foundWalletDetailDoc.get("totalRTKBalanceForPool");
+    }
+
+    public ProxyIP getProxyIP() {
+        Collections.shuffle(allProxies);
+        return allProxies.get(0);
     }
 
     public void addAmountToWalletFeesBalance(String amount) {
