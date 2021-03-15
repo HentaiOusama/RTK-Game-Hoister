@@ -104,6 +104,7 @@ public class Game implements Runnable {
     private int connectionCount = 0;
     private volatile boolean allowConnector = true;
     private final boolean shouldSendNotificationToMainRTKChat;
+    private boolean isBalanceEnough = false;
 
     // Blockchain Related Stuff
     private final String EthNetworkType, shotWallet;
@@ -184,7 +185,7 @@ public class Game implements Runnable {
             return;
         }
 
-        if (notHasEnoughBalance()) {
+        if (!isBalanceEnough) {
             last_bounty_hunter_bot.sendMessage(chat_id, String.format("""
                             Rewards Wallet %s doesn't have enough eth for transactions. Please contact admins. Closing Game...
                                                         
@@ -488,7 +489,7 @@ public class Game implements Runnable {
 
                 checkForStatus(51);
                 last_bounty_hunter_bot.lastSendStatus = 1;
-                if (notHasEnoughBalance()) {
+                if (!hasEnoughBalance()) {
                     last_bounty_hunter_bot.sendMessage(chat_id, "Rewards Wallet " + shotWallet + " doesn't have enough currency for transactions. " +
                             "Please contact admins. Closing Game\n\nMinimum currency required : " + new BigDecimal(minGasFees).divide(
                             new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN) + ". Actual Balance = " + rewardWalletBalance +
@@ -714,6 +715,7 @@ public class Game implements Runnable {
         last_bounty_hunter_bot.logsPrintStream.println("Building Filter\nLast Checked Block Number : " + lastCheckedTransactionData.blockNumber);
         RTKContractFilter = new EthFilter(new DefaultBlockParameterNumber(lastCheckedTransactionData.blockNumber),
                 DefaultBlockParameterName.LATEST, RTKContractAddresses);
+        isBalanceEnough = hasEnoughBalance();
         try {
             disposable = web3j.ethLogFlowable(RTKContractFilter).subscribe(log -> {
                 String hash = log.getTransactionHash();
@@ -784,7 +786,7 @@ public class Game implements Runnable {
         return currentTransactionData;
     }
 
-    private boolean notHasEnoughBalance() {
+    private boolean hasEnoughBalance() {
         boolean retVal = false;
 
         try {
@@ -802,7 +804,7 @@ public class Game implements Runnable {
             e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
         }
 
-        return !retVal;
+        return retVal;
     }
 
     private void sendRewardToWinner(BigInteger amount, String toAddress) {

@@ -19,6 +19,9 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.*;
 import java.math.BigInteger;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -111,8 +114,9 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     PrintStream logsPrintStream;
     int undisposedGameCount = 0;
     final String proxyUsername, proxyPassword;
-    boolean shouldUseProxy = false;
+    boolean shouldUseProxy;
     private final ArrayList<ProxyIP> allProxies = new ArrayList<>();
+    private Instant lastGameEndTime;
 
     // Blockchain Related Stuff
     private String EthNetworkType;
@@ -269,6 +273,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                 }
             }
         }
+        lastGameEndTime = Instant.now();
     }
 
     @Override
@@ -277,255 +282,262 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
             String chatId = update.getMessage().getChatId().toString();
             String text = update.getMessage().getText();
             logsPrintStream.println("Incoming Message :\n" + text);
-            if (!shouldRunGame && text.equalsIgnoreCase("runBot")) {
-                try {
-                    if ((EthNetworkType.equals("mainnet") || EthNetworkType.equals("maticMainnet")) && !currentlyActiveGames.containsKey(actualGameChatId)) {
-                        Game newGame = new Game(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
-                        currentlyActiveGames.put(actualGameChatId, newGame);
-                        if (!gameRunningExecutorService.isShutdown()) {
-                            gameRunningExecutorService.shutdownNow();
+            try {
+                if (!shouldRunGame && text.equalsIgnoreCase("runBot")) {
+                    if(!(Math.abs(Duration.between(Instant.now(), lastGameEndTime).toSeconds()) > 45)) {
+                        sendMessage(chatId, "Please wait at least 40 Seconds between stopBot / runBot Commands");
+                        return;
+                    }
+
+                    try {
+                        if ((EthNetworkType.equals("mainnet") || EthNetworkType.equals("maticMainnet")) && !currentlyActiveGames.containsKey(actualGameChatId)) {
+                            Game newGame = new Game(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
+                            currentlyActiveGames.put(actualGameChatId, newGame);
+                            if (!gameRunningExecutorService.isShutdown()) {
+                                gameRunningExecutorService.shutdownNow();
+                            }
+                            gameRunningExecutorService = Executors.newCachedThreadPool();
+                            gameRunningExecutorService.execute(newGame);
                         }
-                        gameRunningExecutorService = Executors.newCachedThreadPool();
-                        gameRunningExecutorService.execute(newGame);
-                    }
-                    else if ((EthNetworkType.equals("ropsten") || EthNetworkType.equals("maticMumbai")) && !currentlyActiveGames.containsKey(testingChatId)) {
-                        Game newGame = new Game(this, testingChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
-                        currentlyActiveGames.put(testingChatId, newGame);
-                        if (!gameRunningExecutorService.isShutdown()) {
-                            gameRunningExecutorService.shutdownNow();
+                        else if ((EthNetworkType.equals("ropsten") || EthNetworkType.equals("maticMumbai")) && !currentlyActiveGames.containsKey(testingChatId)) {
+                            Game newGame = new Game(this, testingChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
+                            currentlyActiveGames.put(testingChatId, newGame);
+                            if (!gameRunningExecutorService.isShutdown()) {
+                                gameRunningExecutorService.shutdownNow();
+                            }
+                            gameRunningExecutorService = Executors.newCachedThreadPool();
+                            gameRunningExecutorService.execute(newGame);
                         }
-                        gameRunningExecutorService = Executors.newCachedThreadPool();
-                        gameRunningExecutorService.execute(newGame);
+                        else {
+                            throw new Exception("Operation Unsuccessful. Currently a game is running. Let the game finish before starting" +
+                                    " the bot.");
+                        }
+                        undisposedGameCount++;
+                        lastSendStatus = -1;
+                        if (!messageSendingExecutor.isShutdown()) {
+                            messageSendingExecutor.shutdownNow();
+                        }
+                        messageSendingExecutor = Executors.newSingleThreadScheduledExecutor();
+                        messageSendingExecutor.scheduleWithFixedDelay(new MessageSender(), 0, 1200, TimeUnit.MILLISECONDS);
+                        shouldRunGame = true;
+                        Document botNameDoc = new Document("botName", botName);
+                        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                        Bson updatedAddyDoc = new Document("shouldRunGame", shouldRunGame);
+                        Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
+                        assert foundBotNameDoc != null;
+                        botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
+                        sendMessage(chatId, "Operation Successful");
+                    } catch (Exception e) {
+                        e.printStackTrace(logsPrintStream);
+                        sendMessage(chatId, e.getMessage());
                     }
-                    else {
-                        throw new Exception("Operation Unsuccessful. Currently a game is running. Let the game finish before starting" +
-                                " the bot.");
+                }
+                else if (shouldRunGame && text.equalsIgnoreCase("stopBot")) {
+                    shouldRunGame = false;
+                    Set<String> keys = currentlyActiveGames.keySet();
+                    for (String key : keys) {
+                        currentlyActiveGames.get(key).setShouldContinueGame(false);
                     }
-                    undisposedGameCount++;
-                    lastSendStatus = -1;
-                    if (!messageSendingExecutor.isShutdown()) {
-                        messageSendingExecutor.shutdownNow();
-                    }
-                    messageSendingExecutor = Executors.newSingleThreadScheduledExecutor();
-                    messageSendingExecutor.scheduleWithFixedDelay(new MessageSender(), 0, 1200, TimeUnit.MILLISECONDS);
-                    shouldRunGame = true;
                     Document botNameDoc = new Document("botName", botName);
                     Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
                     Bson updatedAddyDoc = new Document("shouldRunGame", shouldRunGame);
                     Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
                     assert foundBotNameDoc != null;
                     botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
-                    sendMessage(chatId, "Operation Successful");
-                } catch (Exception e) {
-                    e.printStackTrace(logsPrintStream);
-                    sendMessage(chatId, e.getMessage());
+                    sendMessage(chatId, "Operation Successful. Please keep an eye on Active Processes before using modification commands");
                 }
-            }
-            else if (shouldRunGame && text.equalsIgnoreCase("stopBot")) {
-                shouldRunGame = false;
-                Set<String> keys = currentlyActiveGames.keySet();
-                for (String key : keys) {
-                    currentlyActiveGames.get(key).setShouldContinueGame(false);
-                }
-                Document botNameDoc = new Document("botName", botName);
-                Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
-                Bson updatedAddyDoc = new Document("shouldRunGame", shouldRunGame);
-                Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
-                assert foundBotNameDoc != null;
-                botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
-                sendMessage(chatId, "Operation Successful. Please keep an eye on Active Processes before using modification commands");
-            }
-            else if (text.equalsIgnoreCase("ActiveProcesses")) {
-                Set<String> keys = currentlyActiveGames.keySet();
-                int count = 0;
-                for (String key : keys) {
-                    if (currentlyActiveGames.get(key).isGameRunning) {
-                        count++;
-                    }
-                }
-                sendMessage(chatId, "Chats with Active Games  :  " + currentlyActiveGames.size() + "\n\nChats with ongoing Round  :  "
-                        + count + "\n\n\n----------------------------\nFor Dev Use Only (Ignore \uD83D\uDC47)\n\nUndisposed Game Count : "
-                        + undisposedGameCount);
-            }
-            else if (text.equalsIgnoreCase("Switch to mainnet")) {
-                switchNetworks(chatId, EthNetworkType, "mainnet");
-            }
-            else if (text.equalsIgnoreCase("Switch to ropsten")) {
-                switchNetworks(chatId, EthNetworkType, "ropsten");
-            }
-            else if (text.equalsIgnoreCase("Switch to maticMainnet")) {
-                switchNetworks(chatId, EthNetworkType, "maticMainnet");
-            }
-            else if (text.equalsIgnoreCase("Switch to maticMumbai")) {
-                switchNetworks(chatId, EthNetworkType, "maticMumbai");
-            }
-            else if (text.toLowerCase().startsWith("setpot")) {
-                Set<String> keys = currentlyActiveGames.keySet();
-                boolean isAnyGameRunning = false;
-                for (String key : keys) {
-                    isAnyGameRunning = isAnyGameRunning || currentlyActiveGames.get(key).isGameRunning;
-                }
-                if (!isAnyGameRunning) {
-                    try {
-                        BigInteger amount = new BigInteger(text.split(" ")[1]);
-                        BigInteger diffBalance = amount.subtract(new BigInteger(getTotalRTKForPoolInWallet()));
-                        setTotalRTKForPoolInWallet(amount.toString());
-                        for (String key : keys) {
-                            Game game = currentlyActiveGames.get(key);
-                            game.addRTKToPot(diffBalance, "Override");
-                            game.sendBountyUpdateMessage(diffBalance);
+                else if (text.equalsIgnoreCase("ActiveProcesses")) {
+                    Set<String> keys = currentlyActiveGames.keySet();
+                    int count = 0;
+                    for (String key : keys) {
+                        if (currentlyActiveGames.get(key).isGameRunning) {
+                            count++;
                         }
-                    } catch (Exception e) {
-                        e.printStackTrace(logsPrintStream);
-                        sendMessage(chatId, "Correct Format :- setPot amount\namount has to be BigInteger");
                     }
-                } else {
-                    sendMessage(chatId, "Maybe a Round is active in at least on of the chat. Wait for all rounds to end");
+                    sendMessage(chatId, "Chats with Active Games  :  " + currentlyActiveGames.size() + "\n\nChats with ongoing Round  :  "
+                            + count + "\n\n\n----------------------------\nFor Dev Use Only (Ignore \uD83D\uDC47)\n\nUndisposed Game Count : "
+                            + undisposedGameCount);
                 }
-            }
-            else if (text.equalsIgnoreCase("getPot")) {
-                sendMessage(chatId, getTotalRTKForPoolInWallet());
-            }
-            else if (text.toLowerCase().startsWith("setshotcost")) {
-                try {
-                    if (!shouldRunGame && currentlyActiveGames.size() == 0) {
-                        Document botNameDoc = new Document("botName", botName);
-                        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
-                        assert foundBotNameDoc != null;
-                        shotCost = new BigInteger(text.trim().split(" ")[1]);
-                        Bson updatedAddyDoc = new Document("shotCost", shotCost.toString());
-                        Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
-                        botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
+                else if (text.equalsIgnoreCase("Switch to mainnet")) {
+                    switchNetworks(chatId, EthNetworkType, "mainnet");
+                }
+                else if (text.equalsIgnoreCase("Switch to ropsten")) {
+                    switchNetworks(chatId, EthNetworkType, "ropsten");
+                }
+                else if (text.equalsIgnoreCase("Switch to maticMainnet")) {
+                    switchNetworks(chatId, EthNetworkType, "maticMainnet");
+                }
+                else if (text.equalsIgnoreCase("Switch to maticMumbai")) {
+                    switchNetworks(chatId, EthNetworkType, "maticMumbai");
+                }
+                else if (text.toLowerCase().startsWith("setpot")) {
+                    Set<String> keys = currentlyActiveGames.keySet();
+                    boolean isAnyGameRunning = false;
+                    for (String key : keys) {
+                        isAnyGameRunning = isAnyGameRunning || currentlyActiveGames.get(key).isGameRunning;
+                    }
+                    if (!isAnyGameRunning) {
+                        try {
+                            BigInteger amount = new BigInteger(text.split(" ")[1]);
+                            BigInteger diffBalance = amount.subtract(new BigInteger(getTotalRTKForPoolInWallet()));
+                            setTotalRTKForPoolInWallet(amount.toString());
+                            for (String key : keys) {
+                                Game game = currentlyActiveGames.get(key);
+                                game.addRTKToPot(diffBalance, "Override");
+                                game.sendBountyUpdateMessage(diffBalance);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace(logsPrintStream);
+                            sendMessage(chatId, "Correct Format :- setPot amount\namount has to be BigInteger");
+                        }
                     } else {
-                        throw new Exception();
+                        sendMessage(chatId, "Maybe a Round is active in at least on of the chat. Wait for all rounds to end");
                     }
-                } catch (Exception e) {
-                    sendMessage(chatId, "Either the amount is invalid or there is at least one game that is still running.");
                 }
-            }
-            else if (text.equalsIgnoreCase("getShotCost")) {
-                Document botNameDoc = new Document("botName", botName);
-                Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
-                assert foundBotNameDoc != null;
-                sendMessage(chatId, (String) foundBotNameDoc.get("shotCost"));
-            }
-            else if (text.toLowerCase().startsWith("amountpulledoutfromfeesbalance")) {
-                if (!shouldRunGame && currentlyActiveGames.size() == 0) {
+                else if (text.equalsIgnoreCase("getPot")) {
+                    sendMessage(chatId, getTotalRTKForPoolInWallet());
+                }
+                else if (text.toLowerCase().startsWith("setshotcost")) {
                     try {
-                        String amount = text.split(" ")[1];
-                        if (amount.contains("-")) {
-                            throw new Exception("Value Cannot be negative");
+                        if (!shouldRunGame && currentlyActiveGames.size() == 0) {
+                            Document botNameDoc = new Document("botName", botName);
+                            Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                            assert foundBotNameDoc != null;
+                            shotCost = new BigInteger(text.trim().split(" ")[1]);
+                            Bson updatedAddyDoc = new Document("shotCost", shotCost.toString());
+                            Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
+                            botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
+                        } else {
+                            throw new Exception();
                         }
-                        addAmountToWalletFeesBalance("-" + amount);
                     } catch (Exception e) {
-                        sendMessage(chatId, "Correct Format :- amountPulledOutFromFeesBalance amount\n" +
-                                "amount has to be a POSITIVE BigInteger");
+                        sendMessage(chatId, "Either the amount is invalid or there is at least one game that is still running.");
                     }
-                } else {
-                    sendMessage(chatId, "Maybe a Round is active in at least on of the chat. Also maker sure that bot is stopped before using " +
-                            "this command");
                 }
-            }
-            else if (text.equalsIgnoreCase("getFeesBalance")) {
-                sendMessage(chatId, getWalletFeesBalance());
-            }
-            else if (text.equalsIgnoreCase("rebuildAdmins")) {
-                allAdmins = new ArrayList<>();
-                Document walletDetailDoc = new Document("identifier", "adminDetails");
-                Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
-                assert foundWalletDetailDoc != null;
-                if (foundWalletDetailDoc.get("adminID") instanceof List) {
-                    for (int i = 0; i < (((List<?>) foundWalletDetailDoc.get("adminID")).size()); i++) {
-                        Object item = ((List<?>) foundWalletDetailDoc.get("adminID")).get(i);
-                        if (item instanceof Long) {
-                            allAdmins.add((Long) item);
+                else if (text.equalsIgnoreCase("getShotCost")) {
+                    Document botNameDoc = new Document("botName", botName);
+                    Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                    assert foundBotNameDoc != null;
+                    sendMessage(chatId, (String) foundBotNameDoc.get("shotCost"));
+                }
+                else if (text.toLowerCase().startsWith("amountpulledoutfromfeesbalance")) {
+                    if (!shouldRunGame && currentlyActiveGames.size() == 0) {
+                        try {
+                            String amount = text.split(" ")[1];
+                            if (amount.contains("-")) {
+                                throw new Exception("Value Cannot be negative");
+                            }
+                            addAmountToWalletFeesBalance("-" + amount);
+                        } catch (Exception e) {
+                            sendMessage(chatId, "Correct Format :- amountPulledOutFromFeesBalance amount\n" +
+                                    "amount has to be a POSITIVE BigInteger");
                         }
+                    } else {
+                        sendMessage(chatId, "Maybe a Round is active in at least on of the chat. Also maker sure that bot is stopped before using " +
+                                "this command");
                     }
                 }
-            }
-            else if (text.equalsIgnoreCase("rebuildWebSocketUrls")) {
-                Document botNameDoc = new Document("botName", botName);
-                Document foundBotNameDoc = (Document) walletDistributionCollection.find(botNameDoc).first();
-                assert foundBotNameDoc != null;
-                int maticCount = Integer.parseInt(((String) foundBotNameDoc.get("urlCounts")).trim().split(" ")[0]);
-                maticWebSocketUrls = new ArrayList<>();
-                etherWebSocketUrls = new ArrayList<>();
-                if (foundBotNameDoc.get("urlList") instanceof List) {
-                    for (int i = 0; i < (((List<?>) foundBotNameDoc.get("urlList")).size()); i++) {
-                        Object item = ((List<?>) foundBotNameDoc.get("urlList")).get(i);
-                        if (item instanceof String) {
-                            if(i == 0) {
-                                maticPrefix = (String) item;
-                            } else if(i == 1) {
-                                etherPrefix = (String) item;
-                            } else if(i < maticCount + 2) {
-                                maticWebSocketUrls.add((String) item);
-                            } else {
-                                etherWebSocketUrls.add((String) item);
+                else if (text.equalsIgnoreCase("getFeesBalance")) {
+                    sendMessage(chatId, getWalletFeesBalance());
+                }
+                else if (text.equalsIgnoreCase("rebuildAdmins")) {
+                    allAdmins = new ArrayList<>();
+                    Document walletDetailDoc = new Document("identifier", "adminDetails");
+                    Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+                    assert foundWalletDetailDoc != null;
+                    if (foundWalletDetailDoc.get("adminID") instanceof List) {
+                        for (int i = 0; i < (((List<?>) foundWalletDetailDoc.get("adminID")).size()); i++) {
+                            Object item = ((List<?>) foundWalletDetailDoc.get("adminID")).get(i);
+                            if (item instanceof Long) {
+                                allAdmins.add((Long) item);
                             }
                         }
                     }
                 }
-            }
-            else if (text.toLowerCase().startsWith("settopupwallet")) {
-                try {
-                    Document document = new Document("identifier", "adminDetails");
-                    Document foundDocument = (Document) walletDistributionCollection.find(document).first();
-                    assert foundDocument != null;
-                    topUpWalletAddress = text.split(" ")[1];
-                    Bson updateDocument = new Document("topUpWalletAddress", topUpWalletAddress);
-                    Bson updateDocumentOp = new Document("$set", updateDocument);
-                    walletDistributionCollection.updateOne(foundDocument, updateDocumentOp);
-                } catch (Exception e) {
-                    sendMessage(chatId, "Invalid Format. Proper Format : setTopUpWallet walletAddress");
+                else if (text.equalsIgnoreCase("rebuildWebSocketUrls")) {
+                    Document botNameDoc = new Document("botName", botName);
+                    Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                    assert foundBotNameDoc != null;
+                    int maticCount = Integer.parseInt(((String) foundBotNameDoc.get("urlCounts")).trim().split(" ")[0]);
+                    maticWebSocketUrls = new ArrayList<>();
+                    etherWebSocketUrls = new ArrayList<>();
+                    if (foundBotNameDoc.get("urlList") instanceof List) {
+                        for (int i = 0; i < (((List<?>) foundBotNameDoc.get("urlList")).size()); i++) {
+                            Object item = ((List<?>) foundBotNameDoc.get("urlList")).get(i);
+                            if (item instanceof String) {
+                                if(i == 0) {
+                                    maticPrefix = (String) item;
+                                } else if(i == 1) {
+                                    etherPrefix = (String) item;
+                                } else if(i < maticCount + 2) {
+                                    maticWebSocketUrls.add((String) item);
+                                } else {
+                                    etherWebSocketUrls.add((String) item);
+                                }
+                            }
+                        }
+                    }
+                    sendMessage(chatId, "Operation Successful");
                 }
-            }
-            else if (text.equalsIgnoreCase("resetWebSocketConnection")) {
-                Set<String> keys = currentlyActiveGames.keySet();
-                for (String key : keys) {
-                    currentlyActiveGames.get(key).setShouldTryToEstablishConnection();
-                }
-            }
-            else if (text.toLowerCase().startsWith("setmessageflow to ")) {
-                if(!shouldRunGame) {
-                    String[] input = text.toLowerCase().trim().split(" ");
-                    shouldAllowMessageFlow = Boolean.parseBoolean(input[2]);
-                } else {
-                    SendMessage sendMessage = new SendMessage();
-                    sendMessage.setChatId(chatId);
-                    sendMessage.setText("Stop All Games Before Changing the Value.");
+                else if (text.toLowerCase().startsWith("settopupwallet")) {
                     try {
-                        super.execute(sendMessage);
+                        Document document = new Document("identifier", "adminDetails");
+                        Document foundDocument = (Document) walletDistributionCollection.find(document).first();
+                        assert foundDocument != null;
+                        topUpWalletAddress = text.split(" ")[1];
+                        Bson updateDocument = new Document("topUpWalletAddress", topUpWalletAddress);
+                        Bson updateDocumentOp = new Document("$set", updateDocument);
+                        walletDistributionCollection.updateOne(foundDocument, updateDocumentOp);
                     } catch (Exception e) {
-                        e.printStackTrace(logsPrintStream);
+                        sendMessage(chatId, "Invalid Format. Proper Format : setTopUpWallet walletAddress");
                     }
                 }
-            }
-            else if (text.toLowerCase().startsWith("setshoulduseproxy to ")) {
-                try {
-                    if (!shouldRunGame && currentlyActiveGames.size() == 0) {
-                        Document botNameDoc = new Document("botName", botName);
-                        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
-                        assert foundBotNameDoc != null;
-                        shouldUseProxy = Boolean.parseBoolean(text.trim().split(" ")[2]);
-                        Bson updatedAddyDoc = new Document("shouldUseProxy", shouldUseProxy);
-                        Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
-                        botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
+                else if (text.equalsIgnoreCase("resetWebSocketConnection")) {
+                    Set<String> keys = currentlyActiveGames.keySet();
+                    for (String key : keys) {
+                        currentlyActiveGames.get(key).setShouldTryToEstablishConnection();
+                    }
+                }
+                else if (text.toLowerCase().startsWith("setmessageflow to ")) {
+                    if(!shouldRunGame) {
+                        String[] input = text.toLowerCase().trim().split(" ");
+                        shouldAllowMessageFlow = Boolean.parseBoolean(input[2]);
                     } else {
-                        throw new Exception();
+                        SendMessage sendMessage = new SendMessage();
+                        sendMessage.setChatId(chatId);
+                        sendMessage.setText("Stop All Games Before Changing the Value.");
+                        try {
+                            super.execute(sendMessage);
+                        } catch (Exception e) {
+                            e.printStackTrace(logsPrintStream);
+                        }
                     }
-                } catch (Exception e) {
-                    sendMessage(chatId, "Either the amount is invalid or there is at least one game that is still running.");
                 }
-            }
-            else if (text.equalsIgnoreCase("getLogs")) {
-                sendLogs(chatId);
-            }
-            else if (text.equalsIgnoreCase("clearLogs")) {
-                new LogClearer().run();
-            }
-            else if (text.equalsIgnoreCase("Commands")) {
-                sendMessage(chatId, """
+                else if (text.toLowerCase().startsWith("setshoulduseproxy to ")) {
+                    try {
+                        if (!shouldRunGame && currentlyActiveGames.size() == 0) {
+                            Document botNameDoc = new Document("botName", botName);
+                            Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                            assert foundBotNameDoc != null;
+                            shouldUseProxy = Boolean.parseBoolean(text.trim().split(" ")[2]);
+                            Bson updatedAddyDoc = new Document("shouldUseProxy", shouldUseProxy);
+                            Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
+                            botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
+                        } else {
+                            throw new Exception();
+                        }
+                    } catch (Exception e) {
+                        sendMessage(chatId, "Either the amount is invalid or there is at least one game that is still running.");
+                    }
+                }
+                else if (text.equalsIgnoreCase("getLogs")) {
+                    sendLogs(chatId);
+                }
+                else if (text.equalsIgnoreCase("clearLogs")) {
+                    new LogClearer().run();
+                }
+                else if (text.equalsIgnoreCase("Commands")) {
+                    sendMessage(chatId, """
                                 runBot
                                 stopBot
                                 ActiveProcesses
@@ -549,13 +561,17 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                                 Commands
 
                                 (amount has to be bigInteger including 18 decimal eth precision)""");
-            }
+                }
 
-            else {
-                sendMessage(chatId, "Such command does not exists. BaaaaaaaaaKa");
+                else {
+                    sendMessage(chatId, "Such command does not exists. BaaaaaaaaaKa");
+                }
+            } catch (Exception e) {
+                e.printStackTrace(logsPrintStream);
             }
-            sendMessage(chatId, "shouldRunGame = " + shouldRunGame + "\nEthNetworkType = " + EthNetworkType +
-                    "\nshouldAllowMessageFlow = " + shouldAllowMessageFlow + "\nRTKContractAddresses = " + Arrays.toString(RTKContractAddresses));
+            sendMessage(chatId, "shouldRunGame : " + shouldRunGame + "\nEthNetworkType : " + EthNetworkType +
+                    "\nshouldAllowMessageFlow : " + shouldAllowMessageFlow + "\nshouldUseProxy : " + shouldUseProxy +
+                    "\nRTKContractAddresses :\n" + Arrays.toString(RTKContractAddresses));
         }
     }
 
@@ -747,14 +763,19 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                 logsPrintStream.println("Game ExecutorService end successful.");
             }
         }.start();
+        currentlyActiveGames.remove(chat_id);
         Document botNameDoc = new Document("botName", botName);
         Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
-        Bson updatedAddyDoc = new Document("wasGameEndMessageSent", true);
-        Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
+        Document intermediate = new Document("wasGameEndMessageSent", true);
+        if(shouldRunGame && currentlyActiveGames.size() == 0) {
+            shouldRunGame = false;
+            intermediate.append("shouldRunGame", false);
+        }
+        Bson updateAddyDocOperation = new Document("$set", intermediate);
         assert foundBotNameDoc != null;
         botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
-        currentlyActiveGames.remove(chat_id);
         lastSendStatus = -1;
+        lastGameEndTime = Instant.now().plus(1500, ChronoUnit.MILLIS);
         return true;
     }
 

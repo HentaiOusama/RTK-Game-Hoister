@@ -1,4 +1,5 @@
 import io.reactivex.disposables.Disposable;
+import okhttp3.OkHttpClient;
 import org.web3j.abi.TypeDecoder;
 import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.generated.Uint256;
@@ -6,17 +7,14 @@ import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.DefaultBlockParameterNumber;
 import org.web3j.protocol.core.methods.request.EthFilter;
-import org.web3j.protocol.core.methods.response.Log;
-import org.web3j.protocol.core.methods.response.Transaction;
+import org.web3j.protocol.core.methods.response.*;
 import org.web3j.protocol.websocket.WebSocketClient;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.math.BigInteger;
 import java.net.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Optional;
-import java.util.Scanner;
+import java.util.*;
 
 
 public class Web3TestingClass {
@@ -28,13 +26,14 @@ public class Web3TestingClass {
         WebSocketService webSocketService = null;
         Disposable disposable = null;
         String val = "mainnet", EthNetworkType = "ropsten";
+        boolean useProxy = false;
         ArrayList<String> webSocketUrls = new ArrayList<>();
         String[] RTKContractAddresses;
         String startBlockNumber;
         // Url Setter and Connect to WebSocket
         if (true) {
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/b59593f7317289035dee5b626e6d3d6dd95c4c91");
-            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/a149b4ed97ba55c6edad87c488229015d3d7124a");
+            //webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/b59593f7317289035dee5b626e6d3d6dd95c4c91");
+            webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/a149b4ed97ba55c6edad87c488229015d3d7124a");    // Working
             webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/871bf83249074ca466951d0e573cae6397033c0a");
             webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/56aa369ae7fd09b65b52f932d7410d38ba287d07");
             webSocketUrls.add("wss://rpc-" + val + ".maticvigil.com/ws/v1/3b0b0d6046e7da8da765b05296085f8c97753c61");
@@ -68,8 +67,6 @@ public class Web3TestingClass {
         }
         System.out.println("Connecting to Web3");
         try {
-
-            Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("45.95.99.20", 7580));
             WebSocketClient webSocketClient = new WebSocketClient(new URI(webSocketUrls.get(0))) {
                 @Override
                 public void onClose(int code, String reason, boolean remote) {
@@ -84,22 +81,23 @@ public class Web3TestingClass {
                             + e.getStackTrace()[0].getLineNumber() + "\nXXXXX\nXXXXX");
                 }
             };
-            webSocketClient.setProxy(proxy);
-            final String authUser = System.getenv("proxyUsername");
-            final String authPassword = System.getenv("proxyPassword");
-            Authenticator.setDefault(
-                    new Authenticator() {
-                        @Override
-                        public PasswordAuthentication getPasswordAuthentication() {
-                            return new PasswordAuthentication(authUser, authPassword.toCharArray());
+            if(useProxy) {
+                Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("45.95.99.20", 7580));
+                webSocketClient.setProxy(proxy);
+                final String authUser = System.getenv("proxyUsername");
+                final String authPassword = System.getenv("proxyPassword");
+                Authenticator.setDefault(
+                        new Authenticator() {
+                            @Override
+                            public PasswordAuthentication getPasswordAuthentication() {
+                                return new PasswordAuthentication(authUser, authPassword.toCharArray());
+                            }
                         }
-                    }
-            );
-
-            System.setProperty("http.proxyUser", authUser);
-            System.setProperty("http.proxyPassword", authPassword);
-
-            System.setProperty("jdk.http.auth.tunneling.disabledSchemes", "");
+                );
+                System.setProperty("http.proxyUser", authUser);
+                System.setProperty("http.proxyPassword", authPassword);
+                System.setProperty("jdk.http.auth.tunneling.disabledSchemes", "");
+            }
             webSocketService = new WebSocketService(webSocketClient, true);
             webSocketService.connect();
         } catch (Exception e) {
@@ -117,6 +115,7 @@ public class Web3TestingClass {
                     DefaultBlockParameterName.LATEST, Arrays.asList(RTKContractAddresses));
             //System.out.println("Logs de Gozaru : " + web3j.ethGetLogs(RTKContractFilter).send().getLogs());
 
+            System.out.println("Building Disposable");
             disposable = web3j.ethLogFlowable(RTKContractFilter).subscribe(log -> {
                 String hash = log.getTransactionHash();
                 if ((prevHash == null) || (!prevHash.equalsIgnoreCase(hash))) {
@@ -143,6 +142,7 @@ public class Web3TestingClass {
         System.out.println("Disposing....");
         assert disposable != null;
         disposable.dispose();
+
         while (!disposable.isDisposed()) {
             System.out.println("Disposable not disposed...");
             try {
@@ -157,7 +157,7 @@ public class Web3TestingClass {
 
 
         Scanner scanner = new Scanner(System.in);
-        char ip = 'y';
+        char ip = 'n';
         while (ip == 'y') {
             System.out.print("Continue (Y/N)? : ");
             ip = scanner.nextLine().charAt(0);
