@@ -632,9 +632,15 @@ public class Game implements Runnable {
             ArrayList<String> webSocketUrls;
             String prefix, infix;
             if(EthNetworkType.startsWith("matic")) {
-                webSocketUrls = last_bounty_hunter_bot.maticWebSocketUrls;
-                prefix = last_bounty_hunter_bot.maticPrefix;
                 infix = EthNetworkType.toLowerCase().substring(5);
+                if(infix.equals("mainnet") && last_bounty_hunter_bot.shouldUseQuickNode) {
+                    webSocketUrls = last_bounty_hunter_bot.quickNodeWebSocketUrls;
+                    prefix = "";
+                    infix = "";
+                } else {
+                    webSocketUrls = last_bounty_hunter_bot.maticWebSocketUrls;
+                    prefix = last_bounty_hunter_bot.maticPrefix;
+                }
             } else {
                 webSocketUrls = last_bounty_hunter_bot.etherWebSocketUrls;
                 prefix = last_bounty_hunter_bot.etherPrefix;
