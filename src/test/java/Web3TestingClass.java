@@ -25,7 +25,7 @@ public class Web3TestingClass {
 
         WebSocketService webSocketService = null;
         Disposable disposable = null;
-        String val = "mainnet", EthNetworkType = "ropsten";
+        String val = "mumbai", EthNetworkType = "ropsten";
         boolean useProxy = false;
         ArrayList<String> webSocketUrls = new ArrayList<>();
         String[] RTKContractAddresses;

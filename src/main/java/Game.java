@@ -197,6 +197,13 @@ public class Game implements Runnable {
             return;
         }
 
+        BigInteger RTKBalance = getNetRTKWalletBalance();
+        if(RTKBalance == null || !(RTKBalance.compareTo(netCurrentPool.add(BigInteger.valueOf(500))) >= 0)) {
+            last_bounty_hunter_bot.sendMessage(chat_id, "Game Wallet RTK Balance too Low. Please Contact admins. Closing the Game...");
+            getCurrentGameDeleted();
+            return;
+        }
+
         scheduledExecutorService2.scheduleWithFixedDelay(new webSocketReconnect(), 0, 5000, TimeUnit.MILLISECONDS);
 
         checkForStatus(1);
@@ -282,7 +289,7 @@ public class Game implements Runnable {
                             quarterWarn = Instant.now().compareTo(currentRoundQuarterTime) < 0;
                         } else {
                             currentRoundHalfTime = currentRoundStartTime.plus(15, ChronoUnit.MINUTES);
-                            currentRoundQuarterTime = currentRoundHalfTime.plus(22, ChronoUnit.MINUTES);
+                            currentRoundQuarterTime = currentRoundStartTime.plus(22, ChronoUnit.MINUTES);
                             currentRoundEndTime = currentRoundStartTime.plus(30, ChronoUnit.MINUTES);
                         }
                         halfValue = 15;
@@ -298,7 +305,7 @@ public class Game implements Runnable {
                             quarterWarn = Instant.now().compareTo(currentRoundQuarterTime) < 0;
                         } else {
                             currentRoundHalfTime = currentRoundStartTime.plus(10, ChronoUnit.MINUTES);
-                            currentRoundQuarterTime = currentRoundHalfTime.plus(15, ChronoUnit.MINUTES);
+                            currentRoundQuarterTime = currentRoundStartTime.plus(15, ChronoUnit.MINUTES);
                             currentRoundEndTime = currentRoundStartTime.plus(20, ChronoUnit.MINUTES);
                         }
                         halfValue = 10;
@@ -317,7 +324,7 @@ public class Game implements Runnable {
                             quarterWarn = Instant.now().compareTo(currentRoundQuarterTime) < 0;
                         } else {
                             currentRoundHalfTime = currentRoundStartTime.plus(5, ChronoUnit.MINUTES);
-                            currentRoundQuarterTime = currentRoundHalfTime.plus(7, ChronoUnit.MINUTES);
+                            currentRoundQuarterTime = currentRoundStartTime.plus(7, ChronoUnit.MINUTES);
                             currentRoundEndTime = currentRoundStartTime.plus(10, ChronoUnit.MINUTES);
                         }
                         halfValue = 5;
@@ -345,7 +352,10 @@ public class Game implements Runnable {
                     }
                     checkForStatus(4);
 
-
+                    last_bounty_hunter_bot.logsPrintStream.println("RoundCount : " + roundCount + "\nStartTime : " + currentRoundStartTime +
+                            "\nHalfTime : " + currentRoundHalfTime + "\nQuarterTime : " + currentRoundQuarterTime + "\nEndTime : " +
+                            currentRoundEndTime + "\nHalfWarn : " + halfWarn + "\nQuarterWarn : " + quarterWarn + "\nShouldRecoverFromAbruptInterruption : "
+                            + shouldRecoverFromAbruptInterruption);
                     MID:
                     while (Instant.now().compareTo(currentRoundEndTime) <= 0) {
                         if (halfWarn) {
@@ -849,57 +859,22 @@ public class Game implements Runnable {
         shouldTryToEstablishConnection = true;
     }
 
-    // Not yet complete. This has to be changed and replace with a checker for minimum balance of RTK.
     private BigInteger getNetRTKWalletBalance() {
         try {
-            ArrayList<String> webSocketUrls;
-            String prefix, middleTerm;
-            if(EthNetworkType.startsWith("matic")) {
-                webSocketUrls = last_bounty_hunter_bot.maticWebSocketUrls;
-                prefix = last_bounty_hunter_bot.maticPrefix;
-                middleTerm = EthNetworkType.toLowerCase().substring(5);
-            } else {
-                webSocketUrls = last_bounty_hunter_bot.etherWebSocketUrls;
-                prefix = last_bounty_hunter_bot.etherPrefix;
-                middleTerm = EthNetworkType;
-            }
-            Collections.shuffle(webSocketUrls);
-            WebSocketClient webSocketClient = new WebSocketClient(new URI(prefix + middleTerm + webSocketUrls.get(0))) {
-                @Override
-                public void onClose(int code, String reason, boolean remote) {
-                    super.onClose(code, reason, remote);
-                    logger.info("(onClose) : " + chat_id + " : WebSocket connection to " + uri + " closed successfully " + reason);
-                    setShouldTryToEstablishConnection();
-                }
-
-                @Override
-                public void onError(Exception e) {
-                    super.onError(e);
-                    setShouldTryToEstablishConnection();
-                    logger.error("XXXXX\nXXXXX\n" + "(onError) : " + chat_id + " : WebSocket connection to " + uri + " failed.... \n" +
-                            "Class : Game.java\nLine No. : " + e.getStackTrace()[0].getLineNumber() + "\nTrying For Reconnect...\nXXXXX\nXXXXX");
-                }
-            };
-            WebSocketService webSocketService = new WebSocketService(webSocketClient, true);
-            webSocketService.connect();
-            Web3j web3j = Web3j.build(webSocketService);
             BigInteger finalValue = new BigInteger("0");
-            for (int i = 0; i < 5; i++) {
-                Function function = new Function("balanceOf",
-                        Collections.singletonList(new Address(shotWallet)),
-                        Collections.singletonList(new TypeReference<Uint256>() {
-                        }));
+            Function function = new Function("balanceOf",
+                    Collections.singletonList(new Address(shotWallet)),
+                    Collections.singletonList(new TypeReference<Uint256>() {
+                    }));
 
-                String encodedFunction = FunctionEncoder.encode(function);
-                org.web3j.protocol.core.methods.response.EthCall response = web3j.ethCall(
-                        org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(shotWallet, RTKContractAddresses.get(i),
-                                encodedFunction), DefaultBlockParameterName.LATEST).send();
-                List<Type> balances = FunctionReturnDecoder.decode(
-                        response.getValue(), function.getOutputParameters());
-                finalValue = finalValue.add(new BigInteger(balances.get(0).getValue().toString()));
-            }
-            web3j.shutdown();
-            webSocketService.close();
+            String encodedFunction = FunctionEncoder.encode(function);
+            org.web3j.protocol.core.methods.response.EthCall response = web3j.ethCall(
+                    org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(shotWallet, RTKContractAddresses.get(0),
+                            encodedFunction), DefaultBlockParameterName.LATEST).send();
+            List<Type> balances = FunctionReturnDecoder.decode(
+                    response.getValue(), function.getOutputParameters());
+            finalValue = finalValue.add(new BigInteger(balances.get(0).getValue().toString()));
+            last_bounty_hunter_bot.logsPrintStream.println("RTK Balance of the Wallet : " + finalValue);
             return finalValue;
         } catch (Exception e) {
             e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);

@@ -599,6 +599,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     public <T extends Serializable, Method extends BotApiMethod<T>> T execute(Method method) throws TelegramApiException {
         if(shouldAllowMessageFlow) {
             return super.execute(method);
+        } else if(isAdmin(Long.parseLong(((SendMessage) method).getChatId()))) {
+            return super.execute(method);
         } else {
             return null;
         }
