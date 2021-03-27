@@ -5,6 +5,7 @@ import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.TypeDecoder;
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Address;
+import org.web3j.abi.datatypes.Bool;
 import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.Type;
 import org.web3j.abi.datatypes.generated.Uint256;
@@ -14,6 +15,7 @@ import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.DefaultBlockParameterNumber;
 import org.web3j.protocol.core.methods.request.EthFilter;
+import org.web3j.protocol.core.methods.response.EthCall;
 import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.core.methods.response.Transaction;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
@@ -26,6 +28,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.net.*;
+import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -105,6 +108,8 @@ public class Game implements Runnable {
     private volatile boolean allowConnector = true;
     private final boolean shouldSendNotificationToMainRTKChat;
     private boolean isBalanceEnough = false;
+    private final SimpleDateFormat simpleDateFormat = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss a");
+    private final String zone;
 
     // Blockchain Related Stuff
     private final String EthNetworkType, shotWallet;
@@ -118,6 +123,7 @@ public class Game implements Runnable {
     private boolean shouldTryToEstablishConnection = true;
     private BigDecimal rewardWalletBalance;
     private BigInteger gasPrice, minGasFees, netCurrentPool = BigInteger.valueOf(0), prizePool = BigInteger.valueOf(0);
+    ArrayList<String> last3CountedHash = new ArrayList<>();
 
     // Constructor
     Game(Last_Bounty_Hunter_Bot last_bounty_hunter_bot, String chat_id, String EthNetworkType, String shotWallet, String[] RTKContractAddresses,
@@ -132,6 +138,10 @@ public class Game implements Runnable {
         this.RTKContractAddresses = Arrays.asList(RTKContractAddresses);
         this.shotCost = shotCost;
         shouldSendNotificationToMainRTKChat = EthNetworkType.toLowerCase().contains("mainnet");
+        long millis = TimeZone.getDefault().getRawOffset();
+        int minutes = (int) ((millis / (1000*60)) % 60);
+        int hours   = (int) ((millis / (1000*60*60)) % 24);
+        zone = "Time Zone - UTC : " + ((millis < 0) ? "-" : "+") + hours + ":" + minutes;
     }
 
     @Override
@@ -147,7 +157,9 @@ public class Game implements Runnable {
         Instant lastGameEndTime = Instant.now();
         if (shouldRecoverFromAbruptInterruption) {
             last_bounty_hunter_bot.makeChecks = true;
-            lastGameEndTime = last_bounty_hunter_bot.getLastGameState().lastGameEndTime;
+            LastGameState lastGameState = last_bounty_hunter_bot.getLastGameState();
+            last3CountedHash = lastGameState.last3CountedHash;
+            lastGameEndTime = lastGameState.lastGameEndTime;
         } else {
             last_bounty_hunter_bot.makeChecks = false;
         }
@@ -197,9 +209,10 @@ public class Game implements Runnable {
             return;
         }
 
-        BigInteger RTKBalance = getNetRTKWalletBalance();
-        if(RTKBalance == null || !(RTKBalance.compareTo(netCurrentPool.add(BigInteger.valueOf(500))) >= 0)) {
-            last_bounty_hunter_bot.sendMessage(chat_id, "Game Wallet RTK Balance too Low. Please Contact admins. Closing the Game...");
+        BigInteger RTKBalance = getNetRTKWalletBalance(1);
+        if(RTKBalance == null || !(RTKBalance.compareTo(netCurrentPool.add(new BigInteger("500000000000000000000"))) >= 0)) {
+            last_bounty_hunter_bot.sendMessage(chat_id, "Game Wallet RTK Balance too Low. (Min. Requirements : poolSize + 500). " +
+                    "Please Contact admins. Closing the Game...");
             getCurrentGameDeleted();
             return;
         }
@@ -352,10 +365,12 @@ public class Game implements Runnable {
                     }
                     checkForStatus(4);
 
-                    last_bounty_hunter_bot.logsPrintStream.println("RoundCount : " + roundCount + "\nStartTime : " + currentRoundStartTime +
-                            "\nHalfTime : " + currentRoundHalfTime + "\nQuarterTime : " + currentRoundQuarterTime + "\nEndTime : " +
-                            currentRoundEndTime + "\nHalfWarn : " + halfWarn + "\nQuarterWarn : " + quarterWarn + "\nShouldRecoverFromAbruptInterruption : "
-                            + shouldRecoverFromAbruptInterruption);
+                    last_bounty_hunter_bot.logsPrintStream.println("RoundCount : " + roundCount + zone + "\nStartTime : " +
+                            simpleDateFormat.format(Date.from(currentRoundStartTime)) + "\nHalfTime : " + simpleDateFormat.format(
+                            Date.from(currentRoundHalfTime)) + "\nQuarterTime : " + simpleDateFormat.format(Date.from(currentRoundQuarterTime))
+                            + "\nEndTime : " + simpleDateFormat.format(Date.from(currentRoundEndTime)) + "\nHalfWarn : " + halfWarn +
+                            "\nQuarterWarn : " + quarterWarn + "\nShouldRecoverFromAbruptInterruption : " + shouldRecoverFromAbruptInterruption);
+
                     MID:
                     while (Instant.now().compareTo(currentRoundEndTime) <= 0) {
                         if (halfWarn) {
@@ -504,6 +519,12 @@ public class Game implements Runnable {
                             "Please contact admins. Closing Game\n\nMinimum currency required : " + new BigDecimal(minGasFees).divide(
                             new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN) + ". Actual Balance = " + rewardWalletBalance +
                             "\n\n\nThe bot will not read any transactions till the balances is updated by admins.");
+                    break;
+                }
+                RTKBalance = getNetRTKWalletBalance(1);
+                if(RTKBalance == null || !(RTKBalance.compareTo(netCurrentPool.add(new BigInteger("500000000000000000000"))) >= 0)) {
+                    last_bounty_hunter_bot.sendMessage(chat_id, "Game Wallet RTK Balance too Low. (Min. Requirements : poolSize + 500). " +
+                            "Please Contact admins. Closing the Game...");
                     break;
                 }
             }
@@ -739,14 +760,14 @@ public class Game implements Runnable {
                     Optional<Transaction> trx = web3j.ethGetTransactionByHash(hash).send().getTransaction();
                     if (trx.isPresent()) {
                         TransactionData currentTrxData = splitInputData(log, trx.get());
-                        //currentTrxData.X = finalI + 1;
-                        last_bounty_hunter_bot.logsPrintStream.print("Chat ID : " + chat_id + " ===>> " + currentTrxData + ", Was Counted = ");
-                        if (!currentTrxData.methodName.equals("Useless") && currentTrxData.toAddress.equalsIgnoreCase(shotWallet)
-                                && currentTrxData.value.compareTo(shotCost) >= 0 && currentTrxData.compareTo(lastCheckedTransactionData) > 0) {
+                        boolean counted = !currentTrxData.methodName.equals("Useless") && currentTrxData.toAddress.equalsIgnoreCase(shotWallet)
+                                && currentTrxData.value.compareTo(shotCost) >= 0 && currentTrxData.compareTo(lastCheckedTransactionData) > 0 &&
+                                !isOldHash(currentTrxData.trxHash);
+                        last_bounty_hunter_bot.logsPrintStream.print("Chat ID : " + chat_id + " ===>> " + currentTrxData +
+                                ", PrevHash : " + prevHash + ", Was Counted = " + counted);
+                        if (counted) {
                             validTransactions.add(currentTrxData);
-                            last_bounty_hunter_bot.logsPrintStream.println("Yes");
-                        } else {
-                            last_bounty_hunter_bot.logsPrintStream.println("No");
+                            pushTransaction(currentTrxData.trxHash);
                         }
                     }
                 }
@@ -859,7 +880,8 @@ public class Game implements Runnable {
         shouldTryToEstablishConnection = true;
     }
 
-    private BigInteger getNetRTKWalletBalance() {
+    private BigInteger getNetRTKWalletBalance(int X) {
+        assert (X >= 1 && X <= 5);
         try {
             BigInteger finalValue = new BigInteger("0");
             Function function = new Function("balanceOf",
@@ -869,16 +891,80 @@ public class Game implements Runnable {
 
             String encodedFunction = FunctionEncoder.encode(function);
             org.web3j.protocol.core.methods.response.EthCall response = web3j.ethCall(
-                    org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(shotWallet, RTKContractAddresses.get(0),
+                    org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(shotWallet, RTKContractAddresses.get(X -1),
                             encodedFunction), DefaultBlockParameterName.LATEST).send();
-            List<Type> balances = FunctionReturnDecoder.decode(
-                    response.getValue(), function.getOutputParameters());
+            List<Type> balances = FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
             finalValue = finalValue.add(new BigInteger(balances.get(0).getValue().toString()));
-            last_bounty_hunter_bot.logsPrintStream.println("RTK Balance of the Wallet : " + finalValue);
+            last_bounty_hunter_bot.logsPrintStream.println("RTKL" + X + " Balance of the Wallet : " + finalValue);
             return finalValue;
         } catch (Exception e) {
             e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
             return null;
         }
+    }
+
+    private void pushTransaction(String hash) {
+        if(last3CountedHash.size() == 3) {
+            last3CountedHash.remove(0);
+        }
+        last3CountedHash.add(hash);
+    }
+
+    private boolean isOldHash(String hash) {
+        return last3CountedHash.contains(hash);
+    }
+
+    private void convertRTKLXIntoRTK(int X, String _amount, String chat_id) {
+        BigInteger balance = getNetRTKWalletBalance(X);
+        BigInteger amount = new BigInteger(_amount);
+        assert (X >= 1 && X <= 5);
+        assert balance != null;
+        assert balance.compareTo(amount) >= 0;
+
+        Function function = new Function("approve",
+                Arrays.asList(new Address(last_bounty_hunter_bot.swapContractAddress), new Uint256(amount)),
+                Collections.singletonList(new TypeReference<Bool>() {
+                }));
+        String approveFunction = FunctionEncoder.encode(function);
+        EthCall response = null;
+
+        try {
+            response = web3j.ethCall(
+                    org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(shotWallet, RTKContractAddresses.get(X-1),
+                            approveFunction), DefaultBlockParameterName.LATEST).send();
+        } catch (Exception e) {
+            last_bounty_hunter_bot.logsPrintStream.println("Error during approve");
+            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
+        }
+        assert response != null;
+        List<Type> operationResult = FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
+        boolean result = Boolean.parseBoolean(operationResult.get(0).getValue().toString());
+
+        if (result) {
+            function = new Function("convertRTKLXIntoRTK",
+                    Arrays.asList(new Address(shotWallet), new Uint256(amount), new Uint256(X)),
+                    Collections.singletonList(new TypeReference<Bool>() {
+                    }));
+            String convertFunction = FunctionEncoder.encode(function);
+            response = null;
+
+            try {
+                response = web3j.ethCall(org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(shotWallet,
+                        last_bounty_hunter_bot.swapContractAddress, convertFunction), DefaultBlockParameterName.LATEST).send();
+            } catch (Exception e) {
+                last_bounty_hunter_bot.logsPrintStream.println("Error during conversion");
+                e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
+            }
+            assert response != null;
+            operationResult = FunctionReturnDecoder.decode(
+                    response.getValue(), function.getOutputParameters());
+            result = Boolean.parseBoolean(operationResult.get(0).getValue().toString());
+            if(result) {
+                last_bounty_hunter_bot.sendMessage(chat_id, "Operation Successful");
+                return;
+            }
+        }
+
+        last_bounty_hunter_bot.sendMessage(chat_id, "Operation Unsuccessful. Check Logs");
     }
 }

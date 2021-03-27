@@ -123,6 +123,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     private final String shotWallet;
     private String[] RTKContractAddresses;
     private BigInteger shotCost;
+    String swapContractAddress;
     String maticPrefix;
     String etherPrefix;
     ArrayList<String> maticWebSocketUrls = new ArrayList<>();
@@ -161,7 +162,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                         logsPrintStream.println("Does basic file exist : " + new File("./PreservedState.bps").exists());
                         FileOutputStream fileOutputStream = new FileOutputStream("./PreservedState.bps");
                         ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
-                        LastGameState lastGameState = new LastGameState(lastSavedStateTransactionData, game.getCurrentRoundEndTime());
+                        LastGameState lastGameState = new LastGameState(lastSavedStateTransactionData, game.getCurrentRoundEndTime(),
+                                game.last3CountedHash);
                         logsPrintStream.println("\nSaved Game State :-\nTrxData --> " + ((lastSavedStateTransactionData == null) ?
                                 "null" : lastSavedStateTransactionData.toString()) + "\nEndTime --> " + ((lastGameState.lastGameEndTime == null) ?
                                 "null" : lastGameState.lastGameEndTime.toString()));
@@ -173,7 +175,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     }
                 }
                 sendLogs(allAdmins.get(0).toString());
-                logsPrintStream.println("\n...Graceful Shutddown Successful...\n");
+                logsPrintStream.println("\n...Graceful Shutdown Successful...\n");
                 logsPrintStream.flush();
                 logsPrintStream.close();
             }
