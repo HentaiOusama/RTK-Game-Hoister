@@ -365,7 +365,7 @@ public class Game implements Runnable {
                     }
                     checkForStatus(4);
 
-                    last_bounty_hunter_bot.logsPrintStream.println("RoundCount : " + roundCount + zone + "\nStartTime : " +
+                    last_bounty_hunter_bot.logsPrintStream.println("RoundCount : " + roundCount + "\n" + zone + "\nStartTime : " +
                             simpleDateFormat.format(Date.from(currentRoundStartTime)) + "\nHalfTime : " + simpleDateFormat.format(
                             Date.from(currentRoundHalfTime)) + "\nQuarterTime : " + simpleDateFormat.format(Date.from(currentRoundQuarterTime))
                             + "\nEndTime : " + simpleDateFormat.format(Date.from(currentRoundEndTime)) + "\nHalfWarn : " + halfWarn +
@@ -763,7 +763,7 @@ public class Game implements Runnable {
                         boolean counted = !currentTrxData.methodName.equals("Useless") && currentTrxData.toAddress.equalsIgnoreCase(shotWallet)
                                 && currentTrxData.value.compareTo(shotCost) >= 0 && currentTrxData.compareTo(lastCheckedTransactionData) > 0 &&
                                 !isOldHash(currentTrxData.trxHash);
-                        last_bounty_hunter_bot.logsPrintStream.print("Chat ID : " + chat_id + " ===>> " + currentTrxData +
+                        last_bounty_hunter_bot.logsPrintStream.println("Chat ID : " + chat_id + " ===>> " + currentTrxData +
                                 ", PrevHash : " + prevHash + ", Was Counted = " + counted);
                         if (counted) {
                             validTransactions.add(currentTrxData);

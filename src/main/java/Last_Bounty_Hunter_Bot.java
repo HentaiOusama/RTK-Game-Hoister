@@ -174,7 +174,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                         e.printStackTrace(logsPrintStream);
                     }
                 }
-                sendLogs(allAdmins.get(0).toString());
+                sendFile(allAdmins.get(0).toString(), "CustomLogsOutput.txt");
                 logsPrintStream.println("\n...Graceful Shutdown Successful...\n");
                 logsPrintStream.flush();
                 logsPrintStream.close();
@@ -542,7 +542,10 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
                 }
                 else if (text.equalsIgnoreCase("getLogs")) {
-                    sendLogs(chatId);
+                    sendFile(chatId, "CustomLogsOutput.txt");
+                }
+                else if (text.equalsIgnoreCase("getBotPreservedState")) {
+                    sendFile(chatId, "PreservedState.bps");
                 }
                 else if (text.equalsIgnoreCase("clearLogs")) {
                     new LogClearer().run();
@@ -568,7 +571,10 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                                 resetWebSocketConnection
                                 setMessageFlow to boolean
                                 setShouldUseProxy to boolean
+                                setShouldUseQuickNode to boolean
                                 getLogs
+                                getBotPreservedState
+                                clearLogs
                                 Commands
 
                                 (amount has to be bigInteger including 18 decimal eth precision)""");
@@ -738,11 +744,11 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         }
     }
 
-    private void sendLogs(String chatId) {
+    private void sendFile(String chatId, String fileName) {
         SendDocument sendDocument = new SendDocument();
         sendDocument.setChatId(chatId);
         logsPrintStream.flush();
-        sendDocument.setDocument(new InputFile().setMedia(new File("CustomLogsOutput.txt")));
+        sendDocument.setDocument(new InputFile().setMedia(new File(fileName)));
         sendDocument.setCaption("Lastest Logs");
         try {
             execute(sendDocument);
@@ -874,6 +880,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
             String msg = "\nPrevious State read :- \nTrxData -->";
             if(lastGameState.lastCheckedTransactionData != null) {
                 msg += lastGameState.lastCheckedTransactionData.toString();
+                msg += ", Last 3 Trx Hash : " + lastGameState.last3CountedHash;
             } else {
                 msg += "null";
             }
