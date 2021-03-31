@@ -150,34 +150,43 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
             @Override
             public void run() {
                 super.run();
-                logsPrintStream.println("\n...Shutdown Handler Called...\n...Initiating Graceful Shutdown...\n");
+                logsPrintStream.println("\n...Shutdown Handler Called ---> Initiating Graceful Shutdown...\n");
                 gameRunningExecutorService.shutdownNow();
                 messageSendingExecutor.shutdownNow();
                 logClearingExecutor.shutdownNow();
                 Set<String> keys = currentlyActiveGames.keySet();
+                Document tempDoc = new Document();
                 for(String key : keys) {
                     Game game = currentlyActiveGames.get(key);
-                    try {
-                        logsPrintStream.println("Checking File Path : " + new File(".").getCanonicalPath());
-                        logsPrintStream.println("Does basic file exist : " + new File("./PreservedState.bps").exists());
-                        FileOutputStream fileOutputStream = new FileOutputStream("./PreservedState.bps");
-                        ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
-                        LastGameState lastGameState = new LastGameState(lastSavedStateTransactionData, game.getCurrentRoundEndTime(),
-                                game.last3CountedHash);
-                        logsPrintStream.println("\nSaved Game State :-\nTrxData --> " + ((lastSavedStateTransactionData == null) ?
-                                "null" : lastSavedStateTransactionData.toString()) + "\nEndTime --> " + ((lastGameState.lastGameEndTime == null) ?
-                                "null" : lastGameState.lastGameEndTime.toString()));
-                        objectOutputStream.writeObject(lastGameState);
-                        objectOutputStream.close();
-                        fileOutputStream.close();
-                    } catch (IOException e) {
-                        e.printStackTrace(logsPrintStream);
+                    Document botNameDoc = new Document("botName", botName);
+                    Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+
+                    tempDoc.append("trxHash", lastSavedStateTransactionData.trxHash)
+                            .append("from", lastSavedStateTransactionData.fromAddress)
+                            .append("to", lastSavedStateTransactionData.toAddress)
+                            .append("X", lastSavedStateTransactionData.X)
+                            .append("didBurn", lastSavedStateTransactionData.didBurn)
+                            .append("block", lastSavedStateTransactionData.blockNumber.toString())
+                            .append("trxIndex", lastSavedStateTransactionData.trxIndex.toString())
+                            .append("value", lastSavedStateTransactionData.value.toString());
+                    Instant instant = game.getCurrentRoundEndTime();
+                    tempDoc.append("endTime", (instant == null) ? "NULL" : instant.toString());
+                    for(int i = 0; i < 3; i++) {
+                        if(i < game.last3CountedHash.size())
+                            tempDoc.append("lastCountedHash" + i, game.last3CountedHash.get(i));
+                        else
+                            tempDoc.append("lastCountedHash" + i, "NULL");
                     }
+
+                    Bson updateAddyDocOperation = new Document("$set", tempDoc);
+                    assert foundBotNameDoc != null;
+                    botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
                 }
-                sendFile(allAdmins.get(0).toString(), "CustomLogsOutput.txt");
-                logsPrintStream.println("\n...Graceful Shutdown Successful...\n");
+                logsPrintStream.println("\nSaved Game State :-\n" + tempDoc.toString());
+                sendLogs(allAdmins.get(0).toString());
                 logsPrintStream.flush();
                 logsPrintStream.close();
+                System.out.println("\n...Graceful Shutdown Successful...\n");
             }
         });
 
@@ -542,10 +551,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
                 }
                 else if (text.equalsIgnoreCase("getLogs")) {
-                    sendFile(chatId, "CustomLogsOutput.txt");
-                }
-                else if (text.equalsIgnoreCase("getBotPreservedState")) {
-                    sendFile(chatId, "PreservedState.bps");
+                    sendLogs(chatId);
                 }
                 else if (text.equalsIgnoreCase("clearLogs")) {
                     new LogClearer().run();
@@ -573,7 +579,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                                 setShouldUseProxy to boolean
                                 setShouldUseQuickNode to boolean
                                 getLogs
-                                getBotPreservedState
                                 clearLogs
                                 Commands
 
@@ -744,11 +749,11 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         }
     }
 
-    private void sendFile(String chatId, String fileName) {
+    private void sendLogs(String chatId) {
         SendDocument sendDocument = new SendDocument();
         sendDocument.setChatId(chatId);
         logsPrintStream.flush();
-        sendDocument.setDocument(new InputFile().setMedia(new File(fileName)));
+        sendDocument.setDocument(new InputFile().setMedia(new File("CustomLogsOutput.txt")));
         sendDocument.setCaption("Lastest Logs");
         try {
             execute(sendDocument);
@@ -873,32 +878,45 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     }
 
     public LastGameState getLastGameState() {
+        Document botNameDoc = new Document("botName", botName);
+        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+        assert foundBotNameDoc != null;
+        TransactionData transactionData = new TransactionData();
+        transactionData.trxHash = (String) foundBotNameDoc.get("trxHash");
+        transactionData.fromAddress = (String) foundBotNameDoc.get("from");
+        transactionData.toAddress = (String) foundBotNameDoc.get("to");
+        transactionData.X = (int) foundBotNameDoc.get("X");
+        transactionData.didBurn = (boolean) foundBotNameDoc.get("didBurn");
+        transactionData.blockNumber = new BigInteger((String) foundBotNameDoc.get("block"));
+        transactionData.trxIndex = new BigInteger((String) foundBotNameDoc.get("trxIndex"));
+        transactionData.value = new BigInteger((String) foundBotNameDoc.get("value"));
+        ArrayList<String> arrayList = new ArrayList<>();
+        arrayList.add((String) foundBotNameDoc.get("lastCountedHash0"));
+        arrayList.add((String) foundBotNameDoc.get("lastCountedHash1"));
+        arrayList.add((String) foundBotNameDoc.get("lastCountedHash2"));
+        String endTime = (String) foundBotNameDoc.get("endTime");
+        LastGameState lastGameState;
         try {
-            FileInputStream fileInputStream = new FileInputStream("./PreservedState.bps");
-            ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
-            LastGameState lastGameState = (LastGameState) objectInputStream.readObject();
-            String msg = "\nPrevious State read :- \nTrxData -->";
-            if(lastGameState.lastCheckedTransactionData != null) {
-                msg += lastGameState.lastCheckedTransactionData.toString();
-                msg += ", Last 3 Trx Hash : " + lastGameState.last3CountedHash;
-            } else {
-                msg += "null";
-            }
-            msg += "\nEnd Time --> ";
-            if(lastGameState.lastGameEndTime != null) {
-                msg += lastGameState.lastGameEndTime.toString();
-            } else {
-                msg += "null";
-            }
-            logsPrintStream.println(msg);
-            lastSavedStateTransactionData = lastGameState.lastCheckedTransactionData;
-            objectInputStream.close();
-            fileInputStream.close();
-            return lastGameState;
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace(logsPrintStream);
-            return null;
+            lastGameState = new LastGameState(transactionData, Instant.parse(endTime), arrayList);
+        } catch (Exception e) {
+            lastGameState = new LastGameState(transactionData, null, arrayList);
         }
+        String msg = "\nPrevious State read :- \nTrxData -->";
+        if(lastGameState.lastCheckedTransactionData != null) {
+            msg += lastGameState.lastCheckedTransactionData.toString();
+            msg += ", Last 3 Trx Hash : " + lastGameState.last3CountedHash;
+        } else {
+            msg += "null";
+        }
+        msg += "\nEnd Time --> ";
+        if(lastGameState.lastGameEndTime != null) {
+            msg += lastGameState.lastGameEndTime.toString();
+        } else {
+            msg += "null";
+        }
+        logsPrintStream.println(msg);
+        lastSavedStateTransactionData = lastGameState.lastCheckedTransactionData;
+        return lastGameState;
     }
 
     public void setLastCheckedTransactionDetails(TransactionData transactionData) {

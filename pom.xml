@@ -73,7 +73,6 @@
                 <configuration>
                     <appName>last-bounty-hunter-bot</appName>
                     <includes>
-                        <include>PreservedState.bps</include>
                         <include>CustomLogsOutput.txt</include>
                     </includes>
                     <processTypes>

@@ -153,7 +153,9 @@ public class Game implements Runnable {
         netCurrentPool = new BigInteger(last_bounty_hunter_bot.getTotalRTKForPoolInWallet());
         prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
 
+        last_bounty_hunter_bot.logsPrintStream.println("Last Game Last Checked TrxData ===>> " + lastCheckedTransactionData);
         shouldRecoverFromAbruptInterruption = !last_bounty_hunter_bot.getWasGameEndMessageSent();
+        last_bounty_hunter_bot.logsPrintStream.println("Was Game End Message sent : " + !shouldRecoverFromAbruptInterruption);
         Instant lastGameEndTime = Instant.now();
         if (shouldRecoverFromAbruptInterruption) {
             last_bounty_hunter_bot.makeChecks = true;
