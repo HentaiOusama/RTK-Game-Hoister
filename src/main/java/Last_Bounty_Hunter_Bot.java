@@ -33,7 +33,9 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         public void run() {
             try {
                 TelegramMessage currentMessage = allPendingMessages.take();
-                lastSendStatus = currentMessage.sendStatus;
+                if(currentMessage.sendStatus != -2) {
+                    lastSendStatus = currentMessage.sendStatus;
+                }
                 if(makeChecks) {
                     boolean shouldReturn = true;
                     if(currentMessage.hasTransactionData) {

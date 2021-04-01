@@ -377,18 +377,20 @@ public class Game implements Runnable {
                     while (Instant.now().compareTo(currentRoundEndTime) <= 0) {
                         if (halfWarn) {
                             if (Instant.now().compareTo(currentRoundHalfTime) >= 0) {
-                                last_bounty_hunter_bot.sendMessage(chat_id, "Hurry up! Half Time crossed. LESS THAN " + halfValue + " minutes " +
-                                        "remaining for the current round. Shoot hunter " + finalSender + " down before he claims the bounty!");
+                                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Hurry up! Half Time crossed. LESS THAN " + halfValue + " minutes " +
+                                        "remaining for the current round. Shoot hunter " + finalSender + " down before he claims the bounty!",
+                                        -2, null);
                                 halfWarn = false;
                             }
                         } else if (quarterWarn) {
                             if (Instant.now().compareTo(currentRoundQuarterTime) >= 0) {
-                                last_bounty_hunter_bot.sendMessage(chat_id, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue + " minutes " +
-                                        "remaining for the current round. Shoot hunter " + finalSender + " down before he claims the bounty!");
+                                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue + " minutes " +
+                                        "remaining for the current round. Shoot hunter " + finalSender + " down before he claims the bounty!",
+                                        -2, null);
                                 if(shouldSendNotificationToMainRTKChat) {
-                                    last_bounty_hunter_bot.sendMessage(mainRuletkaChatID, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue +
+                                    last_bounty_hunter_bot.enqueueMessageForSend(mainRuletkaChatID, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue +
                                             " minutes remaining for the current round. Shoot hunter " + finalSender + " down before he claims " +
-                                            "the bounty!\n\nCheckout @Last_Bounty_Hunter_RTK group now and grab that bounty");
+                                            "the bounty!\n\nCheckout @Last_Bounty_Hunter_RTK group now and grab that bounty", -2, null);
                                 }
                                 quarterWarn = false;
                             }
@@ -517,23 +519,23 @@ public class Game implements Runnable {
                 checkForStatus(51);
                 last_bounty_hunter_bot.lastSendStatus = 1;
                 if (!hasEnoughBalance()) {
-                    last_bounty_hunter_bot.sendMessage(chat_id, "Rewards Wallet " + shotWallet + " doesn't have enough currency for transactions. " +
+                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Rewards Wallet " + shotWallet + " doesn't have enough currency for transactions. " +
                             "Please contact admins. Closing Game\n\nMinimum currency required : " + new BigDecimal(minGasFees).divide(
                             new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN) + ". Actual Balance = " + rewardWalletBalance +
-                            "\n\n\nThe bot will not read any transactions till the balances is updated by admins.");
+                            "\n\n\nThe bot will not read any transactions till the balances is updated by admins.", -2, null);
                     break;
                 }
                 RTKBalance = getNetRTKWalletBalance(1);
                 if(RTKBalance == null || !(RTKBalance.compareTo(netCurrentPool.add(new BigInteger("500000000000000000000"))) >= 0)) {
-                    last_bounty_hunter_bot.sendMessage(chat_id, "Game Wallet RTK Balance too Low. (Min. Requirements : poolSize + 500). " +
-                            "Please Contact admins. Closing the Game...");
+                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Game Wallet RTK Balance too Low. (Min. Requirements : poolSize + 500). " +
+                            "Please Contact admins. Closing the Game...", -2, null);
                     break;
                 }
             }
         } catch (Exception e) {
             e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
-            last_bounty_hunter_bot.sendMessage(chat_id, "The bot encountered Fatal Error.\nReference : " + e.getMessage() +
-                    "\n\nPlease Contact @OreGaZembuTouchiSuru");
+            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "The bot encountered Fatal Error.\nReference : " + e.getMessage() +
+                    "\n\nPlease Contact @OreGaZembuTouchiSuru", -2, null);
         }
 
         last_bounty_hunter_bot.setTotalRTKForPoolInWallet(netCurrentPool.toString());
@@ -566,8 +568,8 @@ public class Game implements Runnable {
     }
 
     public void sendBountyUpdateMessage(BigInteger amount) {
-        last_bounty_hunter_bot.sendMessage(chat_id, "Bounty Increased...Game Host added " + getPrizePool(amount.divide(BigInteger.valueOf(2)))
-                + " to the current Bounty");
+        last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Bounty Increased...Game Host added " + getPrizePool(amount.divide(BigInteger.valueOf(2)))
+                + " to the current Bounty", -2, null);
     }
 
     private String getPrizePool() {
