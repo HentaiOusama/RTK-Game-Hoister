@@ -296,7 +296,7 @@ public class Game implements Runnable {
                     halfWarn = true;
                     quarterWarn = true;
                     if (roundCount == 1) {
-                        if (shouldRecoverFromAbruptInterruption) {
+                        if (shouldRecoverFromAbruptInterruption && lastGameEndTime != null && Instant.now().compareTo(lastGameEndTime) <= 0) {
                             currentRoundEndTime = lastGameEndTime;
                             currentRoundHalfTime = currentRoundEndTime.minus(15, ChronoUnit.MINUTES);
                             currentRoundQuarterTime = currentRoundEndTime.minus(8, ChronoUnit.MINUTES);
@@ -312,7 +312,7 @@ public class Game implements Runnable {
                         msgString = null;
                         last_bounty_hunter_bot.lastSendStatus = 4;
                     } else if (roundCount == 2) {
-                        if (shouldRecoverFromAbruptInterruption) {
+                        if (shouldRecoverFromAbruptInterruption && lastGameEndTime != null && Instant.now().compareTo(lastGameEndTime) <= 0) {
                             currentRoundEndTime = lastGameEndTime;
                             currentRoundHalfTime = currentRoundEndTime.minus(10, ChronoUnit.MINUTES);
                             currentRoundQuarterTime = currentRoundEndTime.minus(5, ChronoUnit.MINUTES);
@@ -331,7 +331,7 @@ public class Game implements Runnable {
                                 ⏱ Time limit: 20 minutes
                                 💰 Bounty: %s""", finalSender, getPrizePool());
                     } else {
-                        if (shouldRecoverFromAbruptInterruption) {
+                        if (shouldRecoverFromAbruptInterruption && lastGameEndTime != null && Instant.now().compareTo(lastGameEndTime) <= 0) {
                             currentRoundEndTime = lastGameEndTime;
                             currentRoundHalfTime = currentRoundEndTime.minus(5, ChronoUnit.MINUTES);
                             currentRoundQuarterTime = currentRoundEndTime.minus(3, ChronoUnit.MINUTES);
@@ -568,8 +568,8 @@ public class Game implements Runnable {
     }
 
     public void sendBountyUpdateMessage(BigInteger amount) {
-        last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Bounty Increased...Game Host added " + getPrizePool(amount.divide(BigInteger.valueOf(2)))
-                + " to the current Bounty", -2, null);
+        last_bounty_hunter_bot.sendMessage(chat_id, "Bounty Increased...Game Host added " + getPrizePool(amount.divide(BigInteger.valueOf(2)))
+                + " to the current Bounty");
     }
 
     private String getPrizePool() {
