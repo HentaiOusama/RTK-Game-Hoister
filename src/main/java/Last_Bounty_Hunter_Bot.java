@@ -37,69 +37,36 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     lastSendStatus = currentMessage.sendStatus;
                 }
                 if(makeChecks) {
-                    boolean shouldReturn = true;
                     if(currentMessage.hasTransactionData) {
-                        if(lastSavedStateTransactionData != null) {
-                            makeChecks = currentMessage.transactionData.compareTo(lastSavedStateTransactionData) < 0;
-                        } else {
-                            shouldReturn = false;
-                            makeChecks = false;
-                        }
-                        if(!makeChecks) {
-                            Set<String> keys = currentlyActiveGames.keySet();
-                            for(String key : keys) {
-                                currentlyActiveGames.get(key).shouldRecoverFromAbruptInterruption = false;
-                            }
-                        }
+                        makeChecks = lastSavedStateTransactionData != null &&
+                                currentMessage.transactionData.compareTo(lastSavedStateTransactionData) <= 0;
                     }
-                    if(shouldReturn) {
-                        return;
+                }
+                if(makeChecks) {
+                    logsPrintStream.println("Msg Failed Check Before Dispatch. Text : " + ((currentMessage.isMessage) ?
+                            currentMessage.sendMessage.getText() : currentMessage.sendAnimation.getCaption()));
+                    return;
+                } else {
+                    Set<String> keys = currentlyActiveGames.keySet();
+                    for(String key : keys) {
+                        currentlyActiveGames.get(key).shouldRecoverFromAbruptInterruption = false;
                     }
                 }
                 if ((currentMessage.isMessage)) {
+                    logsPrintStream.println("Msg Sender (Executor): " + currentMessage.sendMessage.getText());
                     execute(currentMessage.sendMessage);
                 } else {
+                    logsPrintStream.println("Msg Sender (Executor): " + currentMessage.sendAnimation.getCaption());
                     execute(currentMessage.sendAnimation);
                 }
                 if(currentMessage.hasTransactionData) {
                     lastSavedStateTransactionData = currentMessage.transactionData;
+                } else {
+                    logsPrintStream.println("(Message Sender) No Trx Data with the current Msg");
                 }
             } catch (Exception e) {
                 e.printStackTrace(logsPrintStream);
             }
-        }
-    }
-
-    private class LogClearer implements Runnable {
-        @Override
-        public void run() {
-            if(logsPrintStream != null) {
-                logsPrintStream.flush();
-            }
-            try {
-                fileOutputStream = new FileOutputStream("CustomLogsOutput.txt");
-            } catch (FileNotFoundException e) {
-                e.printStackTrace(logsPrintStream);
-            }
-            logsPrintStream = new PrintStream(fileOutputStream) {
-
-                @Override
-                public void println(@Nullable String x) {
-                    super.println("----------------------------- (Open)");
-                    super.println(x);
-                    super.println("----------------------------- (Close)\n\n");
-                }
-
-                @Override
-                public void close() {
-                    try {
-                        fileOutputStream.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    super.close();
-                }
-            };
         }
     }
 
@@ -115,7 +82,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     FileOutputStream fileOutputStream;
     PrintStream logsPrintStream;
     int undisposedGameCount = 0;
-    final String proxyUsername, proxyPassword;
+    String proxyUsername, proxyPassword;
     boolean shouldUseProxy, shouldUseQuickNode;
     private final ArrayList<ProxyIP> allProxies = new ArrayList<>();
     private Instant lastGameEndTime;
@@ -156,43 +123,74 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                 gameRunningExecutorService.shutdownNow();
                 messageSendingExecutor.shutdownNow();
                 logClearingExecutor.shutdownNow();
-                Set<String> keys = currentlyActiveGames.keySet();
-                Document tempDoc = new Document();
-                for(String key : keys) {
-                    Game game = currentlyActiveGames.get(key);
-                    Document botNameDoc = new Document("botName", botName);
-                    Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                if(lastSavedStateTransactionData != null) {
+                    Set<String> keys = currentlyActiveGames.keySet();
+                    Document tempDoc = new Document();
+                    for(String key : keys) {
+                        Game game = currentlyActiveGames.get(key);
+                        Document botNameDoc = new Document("botName", botName);
+                        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
 
-                    tempDoc.append("trxHash", lastSavedStateTransactionData.trxHash)
-                            .append("from", lastSavedStateTransactionData.fromAddress)
-                            .append("to", lastSavedStateTransactionData.toAddress)
-                            .append("X", lastSavedStateTransactionData.X)
-                            .append("didBurn", lastSavedStateTransactionData.didBurn)
-                            .append("block", lastSavedStateTransactionData.blockNumber.toString())
-                            .append("trxIndex", lastSavedStateTransactionData.trxIndex.toString())
-                            .append("value", lastSavedStateTransactionData.value.toString());
-                    Instant instant = game.getCurrentRoundEndTime();
-                    tempDoc.append("endTime", (instant == null) ? "NULL" : instant.toString());
-                    for(int i = 0; i < 3; i++) {
-                        if(i < game.last3CountedHash.size())
-                            tempDoc.append("lastCountedHash" + i, game.last3CountedHash.get(i));
-                        else
-                            tempDoc.append("lastCountedHash" + i, "NULL");
+                        tempDoc.append("trxHash", lastSavedStateTransactionData.trxHash)
+                                .append("from", lastSavedStateTransactionData.fromAddress)
+                                .append("to", lastSavedStateTransactionData.toAddress)
+                                .append("X", lastSavedStateTransactionData.X)
+                                .append("didBurn", lastSavedStateTransactionData.didBurn)
+                                .append("block", lastSavedStateTransactionData.blockNumber.toString())
+                                .append("trxIndex", lastSavedStateTransactionData.trxIndex.toString())
+                                .append("value", lastSavedStateTransactionData.value.toString());
+                        Instant instant = game.getCurrentRoundEndTime();
+                        tempDoc.append("endTime", (instant == null) ? "NULL" : instant.toString());
+                        for(int i = 0; i < 3; i++) {
+                            if(i < game.last3CountedHash.size())
+                                tempDoc.append("lastCountedHash" + i, game.last3CountedHash.get(i));
+                            else
+                                tempDoc.append("lastCountedHash" + i, "NULL");
+                        }
+
+                        Bson updateAddyDocOperation = new Document("$set", tempDoc);
+                        assert foundBotNameDoc != null;
+                        botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
+                        game.tryToSaveState();
                     }
-
-                    Bson updateAddyDocOperation = new Document("$set", tempDoc);
-                    assert foundBotNameDoc != null;
-                    botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
+                    logsPrintStream.println("\nSaved Game State :-\n" + tempDoc.toString());
+                } else {
+                    logsPrintStream.println("Last Saved State Trx Data is NULL. Retaining old value.");
                 }
-                logsPrintStream.println("\nSaved Game State :-\n" + tempDoc.toString());
-                sendLogs(allAdmins.get(0).toString());
                 logsPrintStream.flush();
                 logsPrintStream.close();
+                sendLogs(allAdmins.get(0).toString());
                 System.out.println("\n...Graceful Shutdown Successful...\n");
             }
         });
 
-        logClearingExecutor.scheduleWithFixedDelay(new LogClearer(), 0, 3, TimeUnit.DAYS);
+        if(logsPrintStream != null) {
+            logsPrintStream.flush();
+        }
+        try {
+            fileOutputStream = new FileOutputStream("CustomLogsOutput.txt");
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        logsPrintStream = new PrintStream(fileOutputStream) {
+
+            @Override
+            public void println(@Nullable String x) {
+                super.println("-----------------------------");
+                super.println(x);
+                super.println("-----------------------------");
+            }
+
+            @Override
+            public void close() {
+                try {
+                    fileOutputStream.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                super.close();
+            }
+        };
 
         // Mongo Stuff
         ConnectionString connectionString = new ConnectionString(
@@ -207,92 +205,96 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         botControlCollection = mongoClient.getDatabase("All-Bots-Command-Centre").getCollection("MemberValues");
         walletDistributionCollection = mongoClient.getDatabase("Last-Bounty-Hunter-Bot-Database").getCollection("ManagingData");
 
-        Document walletDetailDoc = new Document("identifier", "adminDetails");
-        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
-        assert foundWalletDetailDoc != null;
-        topUpWalletAddress = (String) foundWalletDetailDoc.get("topUpWalletAddress");
-        if (foundWalletDetailDoc.get("adminID") instanceof List) {
-            for (int i = 0; i < (((List<?>) foundWalletDetailDoc.get("adminID")).size()); i++) {
-                Object item = ((List<?>) foundWalletDetailDoc.get("adminID")).get(i);
-                if (item instanceof Long) {
-                    allAdmins.add((Long) item);
-                }
-            }
-        }
-        logsPrintStream.println("TopUpWalletAddress = " + topUpWalletAddress + "\nAdmins = " + allAdmins);
 
-        Document botNameDoc = new Document("botName", botName);
-        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
-        assert foundBotNameDoc != null;
-        shouldRunGame = (boolean) foundBotNameDoc.get("shouldRunGame");
-        this.EthNetworkType = (String) foundBotNameDoc.get("EthNetworkType");
-        this.shotCost = new BigInteger((String) foundBotNameDoc.get("shotCost"));
-        proxyUsername = (String) foundBotNameDoc.get("proxyUsername");
-        proxyPassword = (String) foundBotNameDoc.get("proxyPassword");
-        if (foundBotNameDoc.get("proxyIP") instanceof List) {
-            for (int i = 0; i < (((List<?>) foundBotNameDoc.get("proxyIP")).size()); i++) {
-                Object item = ((List<?>) foundBotNameDoc.get("proxyIP")).get(i);
-                if (item instanceof String) {
-                    allProxies.add(new ProxyIP(((String) item).trim().split(":")));
-                }
-            }
-        }
-        String[] linkCounts = ((String) foundBotNameDoc.get("urlCounts")).trim().split(" ");
-        int maticCount = Integer.parseInt(linkCounts[0]);
-        int QuickNodeCount = Integer.parseInt(linkCounts[1]);
-        if (foundBotNameDoc.get("urlList") instanceof List) {
-            for (int i = 0; i < (((List<?>) foundBotNameDoc.get("urlList")).size()); i++) {
-                Object item = ((List<?>) foundBotNameDoc.get("urlList")).get(i);
-                if (item instanceof String) {
-                    if(i == 0) {
-                        maticPrefix = (String) item;
-                    } else if(i == 1) {
-                        etherPrefix = (String) item;
-                    } else if(i < maticCount + 2) {
-                        maticWebSocketUrls.add((String) item);
-                    } else if(i < maticCount + QuickNodeCount + 2) {
-                        quickNodeWebSocketUrls.add((String) item);
-                    } else {
-                        etherWebSocketUrls.add((String) item);
+        try {
+            Document walletDetailDoc = new Document("identifier", "adminDetails");
+            Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+            assert foundWalletDetailDoc != null;
+            topUpWalletAddress = (String) foundWalletDetailDoc.get("topUpWalletAddress");
+            if (foundWalletDetailDoc.get("adminID") instanceof List) {
+                for (int i = 0; i < (((List<?>) foundWalletDetailDoc.get("adminID")).size()); i++) {
+                    Object item = ((List<?>) foundWalletDetailDoc.get("adminID")).get(i);
+                    if (item instanceof Long) {
+                        allAdmins.add((Long) item);
                     }
                 }
             }
-        }
-        shouldUseProxy = (boolean) foundBotNameDoc.get("shouldUseProxy");
-        shouldUseQuickNode = (boolean) foundBotNameDoc.get("shouldUseQuickNode");
-
-        switch (EthNetworkType) {
-            case "mainnet" -> RTKContractAddresses = new String[]{"0x1F6DEADcb526c4710Cf941872b86dcdfBbBD9211",
-                    "0x66bc87412a2d92a2829137ae9dd0ee063cd0f201", "0xb0f87621a43f50c3b7a0d9f58cc804f0cdc5c267",
-                    "0x4a1c95097473c54619cb0e22c6913206b88b9a1a", "0x63b9713df102ea2b484196a95cdec5d8af278a60"};
-            case "ropsten" -> RTKContractAddresses = new String[]{"0x38332D8671961aE13d0BDe040d536eB336495eEA",
-                    "0x9C72573A47b0d81Ef6048c320bF5563e1606A04C", "0x136A5c9B9965F3827fbB7A9e97E41232Df168B08",
-                    "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8", "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d"};
-            case "maticMainnet" -> RTKContractAddresses = new String[]{"0x38332D8671961aE13d0BDe040d536eB336495eEA",
-                    "0x136A5c9B9965F3827fbB7A9e97E41232Df168B08", "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8",
-                    "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d", "0x88dD15CEac31a828e06078c529F5C1ABB214b6E8"};
-            case "maticMumbai" -> RTKContractAddresses = new String[] {"0x54320152Eb8889a9b28048280001549FAC3E26F5",
-                    "0xc21af68636B79A9F12C11740B81558Ad27C038a6", "0x9D27dE8369fc977a3BcD728868984CEb19cF7F66",
-                    "0xc21EE7D6eF734dc00B3c535dB658Ef85720948d3", "0x39b892Cf8238736c038B833d88B8C91B1D5C8158"};
-        }
-
-        if (shouldRunGame) {
-            undisposedGameCount++;
-            messageSendingExecutor.scheduleWithFixedDelay(new MessageSender(), 0, 1200, TimeUnit.MILLISECONDS);
-            switch (EthNetworkType) {
-                case "mainnet", "maticMainnet" -> {
-                    Game newGame = new Game(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
-                    currentlyActiveGames.put(actualGameChatId, newGame);
-                    gameRunningExecutorService.execute(newGame);
-                }
-                case "ropsten", "maticMumbai" -> {
-                    Game newGame = new Game(this, testingChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
-                    currentlyActiveGames.put(testingChatId, newGame);
-                    gameRunningExecutorService.execute(newGame);
+            logsPrintStream.println("TopUpWalletAddress = " + topUpWalletAddress + "\nAdmins = " + allAdmins);
+            Document botNameDoc = new Document("botName", botName);
+            Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+            assert foundBotNameDoc != null;
+            shouldRunGame = (boolean) foundBotNameDoc.get("shouldRunGame");
+            this.EthNetworkType = (String) foundBotNameDoc.get("EthNetworkType");
+            this.shotCost = new BigInteger((String) foundBotNameDoc.get("shotCost"));
+            proxyUsername = (String) foundBotNameDoc.get("proxyUsername");
+            proxyPassword = (String) foundBotNameDoc.get("proxyPassword");
+            if (foundBotNameDoc.get("proxyIP") instanceof List) {
+                for (int i = 0; i < (((List<?>) foundBotNameDoc.get("proxyIP")).size()); i++) {
+                    Object item = ((List<?>) foundBotNameDoc.get("proxyIP")).get(i);
+                    if (item instanceof String) {
+                        allProxies.add(new ProxyIP(((String) item).trim().split(":")));
+                    }
                 }
             }
+            String[] linkCounts = ((String) foundBotNameDoc.get("urlCounts")).trim().split(" ");
+            int maticCount = Integer.parseInt(linkCounts[0]);
+            int QuickNodeCount = Integer.parseInt(linkCounts[1]);
+            if (foundBotNameDoc.get("urlList") instanceof List) {
+                for (int i = 0; i < (((List<?>) foundBotNameDoc.get("urlList")).size()); i++) {
+                    Object item = ((List<?>) foundBotNameDoc.get("urlList")).get(i);
+                    if (item instanceof String) {
+                        if(i == 0) {
+                            maticPrefix = (String) item;
+                        } else if(i == 1) {
+                            etherPrefix = (String) item;
+                        } else if(i < maticCount + 2) {
+                            maticWebSocketUrls.add((String) item);
+                        } else if(i < maticCount + QuickNodeCount + 2) {
+                            quickNodeWebSocketUrls.add((String) item);
+                        } else {
+                            etherWebSocketUrls.add((String) item);
+                        }
+                    }
+                }
+            }
+            shouldUseProxy = (boolean) foundBotNameDoc.get("shouldUseProxy");
+            shouldUseQuickNode = (boolean) foundBotNameDoc.get("shouldUseQuickNode");
+
+            switch (EthNetworkType) {
+                case "mainnet" -> RTKContractAddresses = new String[]{"0x1F6DEADcb526c4710Cf941872b86dcdfBbBD9211",
+                        "0x66bc87412a2d92a2829137ae9dd0ee063cd0f201", "0xb0f87621a43f50c3b7a0d9f58cc804f0cdc5c267",
+                        "0x4a1c95097473c54619cb0e22c6913206b88b9a1a", "0x63b9713df102ea2b484196a95cdec5d8af278a60"};
+                case "ropsten" -> RTKContractAddresses = new String[]{"0x38332D8671961aE13d0BDe040d536eB336495eEA",
+                        "0x9C72573A47b0d81Ef6048c320bF5563e1606A04C", "0x136A5c9B9965F3827fbB7A9e97E41232Df168B08",
+                        "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8", "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d"};
+                case "maticMainnet" -> RTKContractAddresses = new String[]{"0x38332D8671961aE13d0BDe040d536eB336495eEA",
+                        "0x136A5c9B9965F3827fbB7A9e97E41232Df168B08", "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8",
+                        "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d", "0x88dD15CEac31a828e06078c529F5C1ABB214b6E8"};
+                case "maticMumbai" -> RTKContractAddresses = new String[] {"0x54320152Eb8889a9b28048280001549FAC3E26F5",
+                        "0xc21af68636B79A9F12C11740B81558Ad27C038a6", "0x9D27dE8369fc977a3BcD728868984CEb19cF7F66",
+                        "0xc21EE7D6eF734dc00B3c535dB658Ef85720948d3", "0x39b892Cf8238736c038B833d88B8C91B1D5C8158"};
+            }
+
+            if (shouldRunGame) {
+                undisposedGameCount++;
+                messageSendingExecutor.scheduleWithFixedDelay(new MessageSender(), 0, 1200, TimeUnit.MILLISECONDS);
+                switch (EthNetworkType) {
+                    case "mainnet", "maticMainnet" -> {
+                        Game newGame = new Game(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
+                        currentlyActiveGames.put(actualGameChatId, newGame);
+                        gameRunningExecutorService.execute(newGame);
+                    }
+                    case "ropsten", "maticMumbai" -> {
+                        Game newGame = new Game(this, testingChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
+                        currentlyActiveGames.put(testingChatId, newGame);
+                        gameRunningExecutorService.execute(newGame);
+                    }
+                }
+            }
+            lastGameEndTime = Instant.now();
+        } catch (Exception e) {
+            e.printStackTrace(logsPrintStream);
         }
-        lastGameEndTime = Instant.now();
     }
 
     @Override
@@ -556,7 +558,46 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     sendLogs(chatId);
                 }
                 else if (text.equalsIgnoreCase("clearLogs")) {
-                    new LogClearer().run();
+                    if(logsPrintStream != null) {
+                        logsPrintStream.flush();
+                    }
+                    try {
+                        fileOutputStream = new FileOutputStream("CustomLogsOutput.txt");
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                    logsPrintStream = new PrintStream(fileOutputStream) {
+
+                        @Override
+                        public void println(@Nullable String x) {
+                            super.println("----------------------------- (Open)");
+                            super.println(x);
+                            super.println("----------------------------- (Close)\n\n");
+                        }
+
+                        @Override
+                        public void close() {
+                            try {
+                                fileOutputStream.close();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                            super.close();
+                        }
+                    };
+                }
+                else if (text.toLowerCase().startsWith("getcsv")) {
+                    String[] msg = text.trim().split(" ");
+                    if((msg.length == 3)) {
+                        Set<String> keys = currentlyActiveGames.keySet();
+                        for(String s : keys) {
+                            Game game = currentlyActiveGames.get(s);
+                            game.getAllPreviousTrx(chatId, Integer.parseInt(msg[1]), msg[2]);
+                            break;
+                        }
+                    } else {
+                        sendMessage(chatId, "Invalid Format");
+                    }
                 }
                 else if (text.equalsIgnoreCase("Commands")) {
                     sendMessage(chatId, """
@@ -582,6 +623,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                                 setShouldUseQuickNode to boolean
                                 getLogs
                                 clearLogs
+                                getCSV X startBlock
                                 Commands
 
                                 (amount has to be bigInteger including 18 decimal eth precision)""");
@@ -764,7 +806,19 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         }
     }
 
-    public boolean deleteGame(String chat_id, Game game) {
+    public void sendFile(String chatId, String fileName) {
+        SendDocument sendDocument = new SendDocument();
+        sendDocument.setChatId(chatId);
+        sendDocument.setDocument(new InputFile().setMedia(new File(fileName)));
+        sendDocument.setCaption(fileName);
+        try {
+            execute(sendDocument);
+        } catch (Exception e) {
+            e.printStackTrace(logsPrintStream);
+        }
+    }
+
+    public boolean deleteGame(String chat_id, Game game, String deleterId) {
         logsPrintStream.println("\n...Request made to delete the Game...");
         if (allPendingMessages.size() != 0) {
             if(!messageSendingExecutor.isShutdown()) {
@@ -790,6 +844,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                 logsPrintStream.println("Game ExecutorService end successful.");
             }
         }.start();
+        logsPrintStream.println("Game Deletion from ID : " + deleterId);
         currentlyActiveGames.remove(chat_id);
         Document botNameDoc = new Document("botName", botName);
         Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
@@ -836,14 +891,16 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     }
 
     public void addAmountToWalletFeesBalance(String amount) {
-        Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
-        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
-        assert foundWalletDetailDoc != null;
-        BigInteger balance = new BigInteger((String) foundWalletDetailDoc.get("balanceCollectedAsFees"));
-        balance = balance.add(new BigInteger(amount));
-        Bson updateWalletDoc = new Document("balanceCollectedAsFees", balance.toString());
-        Bson updateWalletDocOperation = new Document("$set", updateWalletDoc);
-        walletDistributionCollection.updateOne(foundWalletDetailDoc, updateWalletDocOperation);
+        if(!amount.equals("0")) {
+            Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
+            Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+            assert foundWalletDetailDoc != null;
+            BigInteger balance = new BigInteger((String) foundWalletDetailDoc.get("balanceCollectedAsFees"));
+            balance = balance.add(new BigInteger(amount));
+            Bson updateWalletDoc = new Document("balanceCollectedAsFees", balance.toString());
+            Bson updateWalletDocOperation = new Document("$set", updateWalletDoc);
+            walletDistributionCollection.updateOne(foundWalletDetailDoc, updateWalletDocOperation);
+        }
     }
 
     public String getWalletFeesBalance() {
