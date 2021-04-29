@@ -203,13 +203,14 @@ public class Game implements Runnable {
             }
 
             if (!isBalanceEnough) {
-                last_bounty_hunter_bot.sendMessage(chat_id, String.format("""
+                last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                             Rewards Wallet %s doesn't have enough eth for transactions. Please contact admins. Closing Game...
                                                         
                             Minimum eth required : %s. Actual Balance = %s
                                                         
                             The bot will not read any transactions till the balances are updated by admins.""", shotWallet,
-                        new BigDecimal(minGasFees).divide(new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN), rewardWalletBalance));
+                        new BigDecimal(minGasFees).divide(new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN), rewardWalletBalance),
+                        -2, null);
                 getCurrentGameDeleted("Deleter-ETH-Insufficient-Balance");
                 return;
             }
@@ -579,11 +580,21 @@ public class Game implements Runnable {
         }
     }
 
-    public void addRTKToPot(BigInteger amount, String sender) {
-        if (!sender.equalsIgnoreCase(last_bounty_hunter_bot.topUpWalletAddress)) {
+    public boolean addRTKToPot(BigInteger amount, String sender) {
+        boolean allow = false;
+        if(sender.equalsIgnoreCase("Override")) {
+            BigInteger rtkBal = getNetRTKWalletBalance(1);
+            allow = (rtkBal != null) && (rtkBal.compareTo(amount.add(new BigInteger("500000000000000000000"))) >= 0);
+        } else if (!sender.equalsIgnoreCase(last_bounty_hunter_bot.topUpWalletAddress)) {
+            allow = true;
+        }
+
+        if(allow) {
             netCurrentPool = netCurrentPool.add(amount);
             prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
         }
+
+        return allow;
     }
 
     public void sendBountyUpdateMessage(BigInteger amount) {

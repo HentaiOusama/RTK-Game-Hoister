@@ -8,6 +8,7 @@
         <outputRelativeToContentRoot value="true" />
         <module name="Deadline Chaser Bot" />
         <module name="Last Bounty Hunter Bot" />
+        <module name="last-bounty-hunter-bot" />
       </profile>
     </annotationProcessing>
   </component>
