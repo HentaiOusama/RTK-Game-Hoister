@@ -1,5 +1,6 @@
+import Supporting_Classes.TransactionData;
+import Supporting_Classes.WebSocketService;
 import io.reactivex.disposables.Disposable;
-import okhttp3.OkHttpClient;
 import org.web3j.abi.TypeDecoder;
 import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.generated.Uint256;
@@ -10,9 +11,7 @@ import org.web3j.protocol.core.methods.request.EthFilter;
 import org.web3j.protocol.core.methods.response.*;
 import org.web3j.protocol.websocket.WebSocketClient;
 
-import java.io.IOException;
 import java.lang.reflect.Method;
-import java.math.BigInteger;
 import java.net.*;
 import java.util.*;
 

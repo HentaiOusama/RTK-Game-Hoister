@@ -1,7 +1,7 @@
 import java.io.Serializable;
 import java.math.BigInteger;
 
-public class TransactionData implements Comparable<TransactionData>, Serializable {
+public class TransactionData implements Comparable<Supporting_Classes.TransactionData>, Serializable {
     String trxHash;
     String methodName;
     String fromAddress;
@@ -13,7 +13,7 @@ public class TransactionData implements Comparable<TransactionData>, Serializabl
     int X;  // X in RTKLX
 
     @Override
-    public int compareTo(TransactionData o) {
+    public int compareTo(Supporting_Classes.TransactionData o) {
         if (blockNumber.compareTo(o.blockNumber) != 0) {
             return blockNumber.compareTo(o.blockNumber);
         } else {
@@ -32,8 +32,8 @@ public class TransactionData implements Comparable<TransactionData>, Serializabl
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof TransactionData) {
-            return trxHash.equals(((TransactionData) obj).trxHash);
+        if (obj instanceof Supporting_Classes.TransactionData) {
+            return trxHash.equals(((Supporting_Classes.TransactionData) obj).trxHash);
         } else {
             return false;
         }

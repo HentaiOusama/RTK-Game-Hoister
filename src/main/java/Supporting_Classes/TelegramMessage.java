@@ -1,21 +1,23 @@
+package Supporting_Classes;
+
 import org.telegram.telegrambots.meta.api.methods.send.SendAnimation;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 
 public class TelegramMessage {
-    int sendStatus;
-    SendMessage sendMessage;
-    SendAnimation sendAnimation;
-    boolean isMessage, hasTransactionData;
-    TransactionData transactionData;
+    public int sendStatus;
+    public SendMessage sendMessage;
+    public SendAnimation sendAnimation;
+    public boolean isMessage, hasTransactionData;
+    public TransactionData transactionData;
 
-    TelegramMessage(SendMessage sendMessage, int sendStatus) {
+    public TelegramMessage(SendMessage sendMessage, int sendStatus) {
         this.sendMessage = sendMessage;
         this.sendStatus = sendStatus;
         isMessage = true;
         hasTransactionData = false;
     }
 
-    TelegramMessage(SendMessage sendMessage, int sendStatus, TransactionData transactionData) {
+    public TelegramMessage(SendMessage sendMessage, int sendStatus, TransactionData transactionData) {
         this.sendMessage = sendMessage;
         this.sendStatus = sendStatus;
         this.transactionData = transactionData;
@@ -23,14 +25,14 @@ public class TelegramMessage {
         hasTransactionData = true;
     }
 
-    TelegramMessage(SendAnimation sendAnimation, int sendStatus) {
+    public TelegramMessage(SendAnimation sendAnimation, int sendStatus) {
         this.sendAnimation = sendAnimation;
         this.sendStatus = sendStatus;
         isMessage = false;
         hasTransactionData = false;
     }
 
-    TelegramMessage(SendAnimation sendAnimation, int sendStatus, TransactionData transactionData) {
+    public TelegramMessage(SendAnimation sendAnimation, int sendStatus, TransactionData transactionData) {
         this.sendAnimation = sendAnimation;
         this.sendStatus = sendStatus;
         this.transactionData = transactionData;

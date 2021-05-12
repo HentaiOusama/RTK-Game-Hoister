@@ -1,6 +1,7 @@
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import Supporting_Classes.WebSocketRequest;
 import org.web3j.protocol.core.BatchResponse;
 import org.web3j.protocol.core.Request;
 import org.web3j.protocol.core.Response;

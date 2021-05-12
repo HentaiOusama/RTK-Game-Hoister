@@ -1,4 +1,4 @@
-/*
+package Supporting_Classes;/*
  * Copyright 2020 Web3 Labs Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
@@ -60,9 +60,9 @@ public class WebSocketService implements Web3jService {
     private static final Logger log = LoggerFactory.getLogger(WebSocketService.class);
 
     // Timeout for JSON-RPC requests
-    static final long REQUEST_TIMEOUT = 60;
+    public static final long REQUEST_TIMEOUT = 60;
     // replaced batch's next id
-    static final AtomicLong nextBatchId = new AtomicLong(0);
+    public static final AtomicLong nextBatchId = new AtomicLong(0);
 
     // WebSocket client
     private final WebSocketClient webSocketClient;
@@ -89,7 +89,7 @@ public class WebSocketService implements Web3jService {
         this(webSocketClient, Executors.newScheduledThreadPool(1), includeRawResponses);
     }
 
-    WebSocketService(
+    public WebSocketService(
             WebSocketClient webSocketClient,
             ScheduledExecutorService executor,
             boolean includeRawResponses) {
@@ -251,13 +251,13 @@ public class WebSocketService implements Web3jService {
                 TimeUnit.SECONDS);
     }
 
-    void closeRequest(long requestId, Exception e) {
+    public void closeRequest(long requestId, Exception e) {
         CompletableFuture result = requestForId.get(requestId).getOnReply();
         requestForId.remove(requestId);
         result.completeExceptionally(e);
     }
 
-    void onWebSocketMessage(String messageStr) throws IOException {
+    public void onWebSocketMessage(String messageStr) throws IOException {
         JsonNode replyJson = parseToTree(messageStr);
 
         if (isReply(replyJson)) {
@@ -527,7 +527,7 @@ public class WebSocketService implements Web3jService {
         executor.shutdown();
     }
 
-    void onWebSocketClose() {
+    public void onWebSocketClose() {
         closeOutstandingRequests();
         closeOutstandingSubscriptions();
     }

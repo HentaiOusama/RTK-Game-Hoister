@@ -1,13 +1,15 @@
-public class ProxyIP {
-    String host;
-    int port;
+package Supporting_Classes;
 
-    ProxyIP(String host, int port) {
+public class ProxyIP {
+    public String host;
+    public int port;
+
+    public ProxyIP(String host, int port) {
         this.host = host;
         this.port = port;
     }
 
-    ProxyIP(String ...array) {
+    public ProxyIP(String... array) {
         host = array[0];
         port = Integer.parseInt(array[1]);
     }

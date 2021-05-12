@@ -1,8 +1,10 @@
+import Supporting_Classes.LBH_LastGameState;
+import Supporting_Classes.TransactionData;
+
 import java.io.*;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 public class TempTest {
     public static void main(String[] args) throws IOException, ClassNotFoundException {
@@ -25,14 +27,14 @@ public class TempTest {
         arrayList.add("Trx 3");
         arrayList.add("Trx 4");
         arrayList.add("Trx 5");
-        LastGameState lastGameState = new LastGameState(transactionData, Instant.parse("2021-03-29T11:53:51.472155033Z"),
+        LBH_LastGameState LBHLastGameState = new LBH_LastGameState(transactionData, Instant.parse("2021-03-29T11:53:51.472155033Z"),
                 arrayList);
 
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         ObjectOutputStream out;
         try {
             out = new ObjectOutputStream(System.out);
-            out.writeObject(lastGameState);
+            out.writeObject(LBHLastGameState);
             out.flush();
         } catch (Exception e) {
             e.printStackTrace();
@@ -58,9 +60,9 @@ public class TempTest {
         arrayList.add("Trx 3");
         arrayList.add("Trx 4");
         arrayList.add("Trx 5");
-        LastGameState lastGameState = new LastGameState(transactionData, Instant.parse("2021-03-29T11:53:51.472155033Z"),
+        LBH_LastGameState LBHLastGameState = new LBH_LastGameState(transactionData, Instant.parse("2021-03-29T11:53:51.472155033Z"),
                 arrayList);
-        objectOutputStream.writeObject(lastGameState);
+        objectOutputStream.writeObject(LBHLastGameState);
         objectOutputStream.close();
         fileOutputStream.close();
     }
@@ -69,17 +71,17 @@ public class TempTest {
         System.out.println("Reading :-");
         FileInputStream fileInputStream = new FileInputStream("./PreservedState.bps");
         ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
-        LastGameState lastGameState = (LastGameState) objectInputStream.readObject();
+        LBH_LastGameState LBHLastGameState = (LBH_LastGameState) objectInputStream.readObject();
         String msg = "\nPrevious State read :- \nTrxData -->";
-        if(lastGameState.lastCheckedTransactionData != null) {
-            msg += lastGameState.lastCheckedTransactionData.toString();
-            msg += ", Last 3 Trx : " + lastGameState.last3CountedHash;
+        if(LBHLastGameState.lastCheckedTransactionData != null) {
+            msg += LBHLastGameState.lastCheckedTransactionData.toString();
+            msg += ", Last 3 Trx : " + LBHLastGameState.last3CountedHash;
         } else {
             msg += "null";
         }
         msg += "\nEnd Time --> ";
-        if(lastGameState.lastGameEndTime != null) {
-            msg += lastGameState.lastGameEndTime.toString();
+        if(LBHLastGameState.lastGameEndTime != null) {
+            msg += LBHLastGameState.lastGameEndTime.toString();
         } else {
             msg += "null";
         }

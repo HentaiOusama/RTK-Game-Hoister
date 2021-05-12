@@ -1,3 +1,7 @@
+import Supporting_Classes.LBH_LastGameState;
+import Supporting_Classes.ProxyIP;
+import Supporting_Classes.TransactionData;
+import Supporting_Classes.WebSocketService;
 import io.reactivex.disposables.Disposable;
 import org.apache.log4j.Logger;
 import org.web3j.abi.FunctionEncoder;
@@ -117,7 +121,7 @@ public class LastBountyHunterGame implements Runnable {
     private final BigInteger shotCost, decimals = new BigInteger("1000000000000000000");
     private final List<String> RTKContractAddresses;
     private String prevHash;
-    private WebSocketService webSocketService; // Custom WebSocketService Used. (Do not Import Web3j....WebSocketService)
+    private Supporting_Classes.WebSocketService webSocketService; // Custom Supporting_Classes.WebSocketService Used. (Do not Import Web3j....Supporting_Classes.WebSocketService)
     private Web3j web3j;
     private Disposable disposable;
     private final ArrayList<TransactionData> validTransactions = new ArrayList<>(), transactionsUnderReview = new ArrayList<>();
@@ -155,16 +159,16 @@ public class LastBountyHunterGame implements Runnable {
             netCurrentPool = new BigInteger(last_bounty_hunter_bot.getTotalRTKForPoolInWallet());
             prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
 
-            last_bounty_hunter_bot.logsPrintStream.println("Last LastBountyHunterGame Last Checked TrxData ===>> " + lastCheckedTransactionData);
+            last_bounty_hunter_bot.logsPrintStream.println("Last Game Last Checked TrxData ===>> " + lastCheckedTransactionData);
             shouldRecoverFromAbruptInterruption = !last_bounty_hunter_bot.getWasGameEndMessageSent();
             abruptRecoveryComplete = !shouldRecoverFromAbruptInterruption;
-            last_bounty_hunter_bot.logsPrintStream.println("Was LastBountyHunterGame End Message sent : " + !shouldRecoverFromAbruptInterruption);
+            last_bounty_hunter_bot.logsPrintStream.println("Was Game End Message sent : " + !shouldRecoverFromAbruptInterruption);
             Instant lastGameEndTime = Instant.now();
             if (shouldRecoverFromAbruptInterruption) {
                 last_bounty_hunter_bot.makeChecks = true;
-                LastGameState lastGameState = last_bounty_hunter_bot.getLastGameState();
-                last3CountedHash = lastGameState.last3CountedHash;
-                lastGameEndTime = lastGameState.lastGameEndTime;
+                LBH_LastGameState LBHLastGameState = last_bounty_hunter_bot.getLastGameState();
+                last3CountedHash = LBHLastGameState.last3CountedHash;
+                lastGameEndTime = LBHLastGameState.lastGameEndTime;
             } else {
                 last_bounty_hunter_bot.makeChecks = false;
             }
@@ -674,7 +678,7 @@ public class LastBountyHunterGame implements Runnable {
         shouldTryToEstablishConnection = true;
 
 
-        // Url + WebSocketClient + WebSocketService  <--- Build + Connect
+        // Url + WebSocketClient + Supporting_Classes.WebSocketService  <--- Build + Connect
         while (shouldTryToEstablishConnection && count < 2) {
             last_bounty_hunter_bot.logsPrintStream.println("Connecting to Blockchain... Attempt : " + (count + 1));
             // Pre Disposer
@@ -700,7 +704,7 @@ public class LastBountyHunterGame implements Runnable {
             }
             count++;
 
-            // Building Urls, WebSocketClient and WebSocketService
+            // Building Urls, WebSocketClient and Supporting_Classes.WebSocketService
             ArrayList<String> webSocketUrls;
             String prefix, infix;
             if(EthNetworkType.startsWith("matic")) {
@@ -769,7 +773,7 @@ public class LastBountyHunterGame implements Runnable {
                 last_bounty_hunter_bot.logsPrintStream.println("Connection Successful");
                 shouldTryToEstablishConnection = false;
             } catch (Exception e) {
-                last_bounty_hunter_bot.logsPrintStream.println("External Error While Connect to WebSocketService... Entered Catch Block");
+                last_bounty_hunter_bot.logsPrintStream.println("External Error While Connect to Supporting_Classes.WebSocketService... Entered Catch Block");
                 e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                 setShouldTryToEstablishConnection();
             }
@@ -779,7 +783,7 @@ public class LastBountyHunterGame implements Runnable {
         }
 
 
-        // Building Web3j over Connected WebSocketService
+        // Building Web3j over Connected Supporting_Classes.WebSocketService
         web3j = Web3j.build(webSocketService);
         try {
             last_bounty_hunter_bot.logsPrintStream.println("Game's Chat ID : " + chat_id + "\nWeb3ClientVersion : " +

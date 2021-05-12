@@ -28,6 +28,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
+import Supporting_Classes.WebSocketRequest;
+import Supporting_Classes.WebSocketRequests;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,7 +38,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.subjects.BehaviorSubject;
-import org.apache.commons.codec.binary.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +51,6 @@ import org.web3j.protocol.core.methods.response.EthSubscribe;
 import org.web3j.protocol.core.methods.response.EthUnsubscribe;
 import org.web3j.protocol.websocket.events.Notification;
 import org.web3j.protocol.websocket.*;
-import org.web3j.protocol.websocket.WebSocketRequests.*;
 
 /**
  * Web socket service that allows to interact with JSON-RPC via WebSocket protocol.
@@ -63,7 +63,7 @@ import org.web3j.protocol.websocket.WebSocketRequests.*;
  * <p>To unsubscribe from a stream of notifications it should send another JSON-RPC request.
  */
 public class WebSocketService implements Web3jService {
-    private static final Logger log = LoggerFactory.getLogger(WebSocketService.class);
+    private static final Logger log = LoggerFactory.getLogger(Supporting_Classes.WebSocketService.class);
 
     // Timeout for JSON-RPC requests
     static final long REQUEST_TIMEOUT = 60;

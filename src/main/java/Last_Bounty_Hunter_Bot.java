@@ -1,3 +1,7 @@
+import Supporting_Classes.LBH_LastGameState;
+import Supporting_Classes.ProxyIP;
+import Supporting_Classes.TelegramMessage;
+import Supporting_Classes.TransactionData;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.client.ClientSession;
@@ -967,7 +971,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         return (boolean) foundBotNameDoc.get("wasGameEndMessageSent");
     }
 
-    public LastGameState getLastGameState() {
+    public LBH_LastGameState getLastGameState() {
         Document botNameDoc = new Document("botName", botName);
         Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
         assert foundBotNameDoc != null;
@@ -985,28 +989,28 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         arrayList.add((String) foundBotNameDoc.get("lastCountedHash1"));
         arrayList.add((String) foundBotNameDoc.get("lastCountedHash2"));
         String endTime = (String) foundBotNameDoc.get("endTime");
-        LastGameState lastGameState;
+        LBH_LastGameState LBHLastGameState;
         try {
-            lastGameState = new LastGameState(transactionData, Instant.parse(endTime), arrayList);
+            LBHLastGameState = new LBH_LastGameState(transactionData, Instant.parse(endTime), arrayList);
         } catch (Exception e) {
-            lastGameState = new LastGameState(transactionData, null, arrayList);
+            LBHLastGameState = new LBH_LastGameState(transactionData, null, arrayList);
         }
         String msg = "\nPrevious State read :- \nTrxData -->";
-        if(lastGameState.lastCheckedTransactionData != null) {
-            msg += lastGameState.lastCheckedTransactionData.toString();
-            msg += ", Last 3 Trx Hash : " + lastGameState.last3CountedHash;
+        if(LBHLastGameState.lastCheckedTransactionData != null) {
+            msg += LBHLastGameState.lastCheckedTransactionData.toString();
+            msg += ", Last 3 Trx Hash : " + LBHLastGameState.last3CountedHash;
         } else {
             msg += "null";
         }
         msg += "\nEnd Time --> ";
-        if(lastGameState.lastGameEndTime != null) {
-            msg += lastGameState.lastGameEndTime.toString();
+        if(LBHLastGameState.lastGameEndTime != null) {
+            msg += LBHLastGameState.lastGameEndTime.toString();
         } else {
             msg += "null";
         }
         logsPrintStream.println(msg);
-        lastSavedStateTransactionData = lastGameState.lastCheckedTransactionData;
-        return lastGameState;
+        lastSavedStateTransactionData = LBHLastGameState.lastCheckedTransactionData;
+        return LBHLastGameState;
     }
 
     public void setLastCheckedTransactionDetails(TransactionData transactionData) {

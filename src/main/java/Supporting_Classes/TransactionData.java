@@ -1,16 +1,18 @@
+package Supporting_Classes;
+
 import java.io.Serializable;
 import java.math.BigInteger;
 
 public class TransactionData implements Comparable<TransactionData>, Serializable {
-    String trxHash;
-    String methodName;
-    String fromAddress;
-    String toAddress;
-    BigInteger value;
-    boolean didBurn;
-    BigInteger blockNumber;
-    BigInteger trxIndex;
-    int X;  // X in RTKLX
+    public String trxHash;
+    public String methodName;
+    public String fromAddress;
+    public String toAddress;
+    public BigInteger value;
+    public boolean didBurn;
+    public BigInteger blockNumber;
+    public BigInteger trxIndex;
+    public int X;  // X in RTKLX
 
     @Override
     public int compareTo(TransactionData o) {

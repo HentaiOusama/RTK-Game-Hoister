@@ -1,3 +1,5 @@
+package Supporting_Classes;
+
 import org.web3j.protocol.core.BatchResponse;
 import org.web3j.protocol.core.Request;
 import org.web3j.protocol.core.Response;
