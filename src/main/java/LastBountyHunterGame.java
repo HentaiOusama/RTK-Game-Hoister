@@ -37,7 +37,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class Game implements Runnable {
+public class LastBountyHunterGame implements Runnable {
 
     private class finalBlockRecorder implements Runnable {
         @Override
@@ -94,7 +94,7 @@ public class Game implements Runnable {
 
 
     // Managing Variables
-    Logger logger = Logger.getLogger(Game.class);
+    Logger logger = Logger.getLogger(LastBountyHunterGame.class);
     volatile boolean isGameRunning = false, shouldContinueGame = true, didSomeoneGotShot = false, hasGameClosed = false;
     volatile TransactionData lastCheckedTransactionData = null;
     volatile boolean shouldRecoverFromAbruptInterruption = false;
@@ -127,8 +127,8 @@ public class Game implements Runnable {
     ArrayList<String> last3CountedHash = new ArrayList<>();
 
     // Constructor
-    Game(Last_Bounty_Hunter_Bot last_bounty_hunter_bot, String chat_id, String EthNetworkType, String shotWallet, String[] RTKContractAddresses,
-         BigInteger shotCost) {
+    LastBountyHunterGame(Last_Bounty_Hunter_Bot last_bounty_hunter_bot, String chat_id, String EthNetworkType, String shotWallet, String[] RTKContractAddresses,
+                         BigInteger shotCost) {
         this.last_bounty_hunter_bot = last_bounty_hunter_bot;
         this.chat_id = chat_id;
         this.EthNetworkType = EthNetworkType;
@@ -155,10 +155,10 @@ public class Game implements Runnable {
             netCurrentPool = new BigInteger(last_bounty_hunter_bot.getTotalRTKForPoolInWallet());
             prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
 
-            last_bounty_hunter_bot.logsPrintStream.println("Last Game Last Checked TrxData ===>> " + lastCheckedTransactionData);
+            last_bounty_hunter_bot.logsPrintStream.println("Last LastBountyHunterGame Last Checked TrxData ===>> " + lastCheckedTransactionData);
             shouldRecoverFromAbruptInterruption = !last_bounty_hunter_bot.getWasGameEndMessageSent();
             abruptRecoveryComplete = !shouldRecoverFromAbruptInterruption;
-            last_bounty_hunter_bot.logsPrintStream.println("Was Game End Message sent : " + !shouldRecoverFromAbruptInterruption);
+            last_bounty_hunter_bot.logsPrintStream.println("Was LastBountyHunterGame End Message sent : " + !shouldRecoverFromAbruptInterruption);
             Instant lastGameEndTime = Instant.now();
             if (shouldRecoverFromAbruptInterruption) {
                 last_bounty_hunter_bot.makeChecks = true;
@@ -178,7 +178,7 @@ public class Game implements Runnable {
                 last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Warning! The bot is running on MATIC Testnet network and not on Mainnet", -1, null);
             }
             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                        Welcome to the Last Bounty Hunter game.
+                        Welcome to the Last Bounty Hunter lastBountyHunterGame.
                         Do you have what it takes to be the Last Bounty Hunter?
                                         
                         Latest Prize Pool : %s
@@ -196,7 +196,7 @@ public class Game implements Runnable {
 
             if (!buildCustomBlockchainReader(true)) {
                 last_bounty_hunter_bot.sendMessage(chat_id, "Error encountered while trying to connect to ethereum network. Cancelling the " +
-                        "game.");
+                        "lastBountyHunterGame.");
 
                 getCurrentGameDeleted("Deleter-Failed-Initial-Blockchain-Connect-Attempt");
                 return;
@@ -204,7 +204,7 @@ public class Game implements Runnable {
 
             if (!isBalanceEnough) {
                 last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                            Rewards Wallet %s doesn't have enough eth for transactions. Please contact admins. Closing Game...
+                            Rewards Wallet %s doesn't have enough eth for transactions. Please contact admins. Closing LastBountyHunterGame...
                                                         
                             Minimum eth required : %s. Actual Balance = %s
                                                         
@@ -217,8 +217,8 @@ public class Game implements Runnable {
 
             BigInteger RTKBalance = getNetRTKWalletBalance(1);
             if(RTKBalance == null || !(RTKBalance.compareTo(netCurrentPool.add(new BigInteger("500000000000000000000"))) >= 0)) {
-                last_bounty_hunter_bot.sendMessage(chat_id, "Game Wallet RTK Balance too Low. (Min. Requirements : poolSize + 500). " +
-                        "Please Contact admins. Closing the Game...");
+                last_bounty_hunter_bot.sendMessage(chat_id, "LastBountyHunterGame Wallet RTK Balance too Low. (Min. Requirements : poolSize + 500). " +
+                        "Please Contact admins. Closing the LastBountyHunterGame...");
                 getCurrentGameDeleted("Deleter-RTK-Insufficient-Balance");
                 return;
             }
@@ -239,7 +239,7 @@ public class Game implements Runnable {
                         continue;
                     }
 
-                    // Check for initial Burned Transaction to start the game.
+                    // Check for initial Burned Transaction to start the lastBountyHunterGame.
                     didSomeoneGotShot = false;
                     TransactionData transactionData;
                     while (!validTransactions.isEmpty()) {
@@ -510,7 +510,7 @@ public class Game implements Runnable {
                         Trx Hash :%s
                         Final pot holder : %s""", finalBurnHash, finalSender), 6, null);
                     last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                                “Ever notice how you come across somebody once in a while you should not have messed with? That’s me.” 
+                                “Ever notice how you come across somebody once in a while you should not have messed with? That’s me.”
                                 %s – The Last Bounty Hunter – claimed the bounty and won %s.""", finalSender, getPrizePool()), 49, null,
                             "https://media.giphy.com/media/5obMzX3pRnSSundkPw/giphy.gif", "https://media.giphy.com/media/m3Su0jtjGHMRMnlC7L/giphy.gif");
                     if(shouldSendNotificationToMainRTKChat) {
@@ -538,15 +538,15 @@ public class Game implements Runnable {
                     last_bounty_hunter_bot.lastSendStatus = 1;
                     if (!hasEnoughBalance()) {
                         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Rewards Wallet " + shotWallet + " doesn't have enough currency for transactions. " +
-                                "Please contact admins. Closing Game\n\nMinimum currency required : " + new BigDecimal(minGasFees).divide(
+                                "Please contact admins. Closing LastBountyHunterGame\n\nMinimum currency required : " + new BigDecimal(minGasFees).divide(
                                 new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN) + ". Actual Balance = " + rewardWalletBalance +
                                 "\n\n\nThe bot will not read any transactions till the balances is updated by admins.", -2, null);
                         break;
                     }
                     RTKBalance = getNetRTKWalletBalance(1);
                     if(RTKBalance == null || !(RTKBalance.compareTo(netCurrentPool.add(new BigInteger("500000000000000000000"))) >= 0)) {
-                        last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Game Wallet RTK Balance too Low. (Min. Requirements : poolSize + 500). " +
-                                "Please Contact admins. Closing the Game...", -2, null);
+                        last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "LastBountyHunterGame Wallet RTK Balance too Low. (Min. Requirements : poolSize + 500). " +
+                                "Please Contact admins. Closing the LastBountyHunterGame...", -2, null);
                         break;
                     }
                 }
@@ -598,16 +598,16 @@ public class Game implements Runnable {
     }
 
     public void sendBountyUpdateMessage(BigInteger amount) {
-        last_bounty_hunter_bot.sendMessage(chat_id, "Bounty Increased...Game Host added " + getPrizePool(amount.divide(BigInteger.valueOf(2)))
+        last_bounty_hunter_bot.sendMessage(chat_id, "Bounty Increased...LastBountyHunterGame Host added " + getPrizePool(amount.divide(BigInteger.valueOf(2)))
                 + " to the current Bounty");
     }
 
     private String getPrizePool() {
-        return new BigDecimal(prizePool).divide(new BigDecimal(decimals), 3, RoundingMode.HALF_EVEN).toString() + " RTK";
+        return new BigDecimal(prizePool).divide(new BigDecimal(decimals), 3, RoundingMode.HALF_EVEN) + " RTK";
     }
 
     private String getPrizePool(BigInteger amount) {
-        return new BigDecimal(amount).divide(new BigDecimal(decimals), 3, RoundingMode.HALF_EVEN).toString() + " RTK";
+        return new BigDecimal(amount).divide(new BigDecimal(decimals), 3, RoundingMode.HALF_EVEN) + " RTK";
     }
 
     public Instant getCurrentRoundEndTime() {
@@ -739,7 +739,7 @@ public class Game implements Runnable {
                     super.onError(e);
                     setShouldTryToEstablishConnection();
                     logger.error("XXXXX\nXXXXX\n" + "(onError) : " + chat_id + " : WebSocket connection to " + uri + " failed.... \n" +
-                            "Class : Game.java\nLine No. : " + e.getStackTrace()[0].getLineNumber() + "\nTrying For Reconnect...\nXXXXX\nXXXXX");
+                            "Class : LastBountyHunterGame.java\nLine No. : " + e.getStackTrace()[0].getLineNumber() + "\nTrying For Reconnect...\nXXXXX\nXXXXX");
                 }
             };
             // Setting up Proxy
@@ -861,7 +861,12 @@ public class Game implements Runnable {
         String method = inputData.substring(0, 10);
         currentTransactionData.methodName = method;
         currentTransactionData.trxHash = transaction.getHash();
-        currentTransactionData.blockNumber = transaction.getBlockNumber();
+        try {
+            currentTransactionData.blockNumber = transaction.getBlockNumber();
+        } catch (Exception e) {
+            currentTransactionData.methodName = "Useless";
+            return currentTransactionData;
+        }
         currentTransactionData.trxIndex = transaction.getTransactionIndex();
         currentTransactionData.X = RTKContractAddresses.indexOf(log.getAddress().toLowerCase());
 
@@ -1010,7 +1015,6 @@ public class Game implements Runnable {
                     last_bounty_hunter_bot.logsPrintStream.println("CSVMaker - ChatID : " + chatId + ", TRX List Size : " + tempLogs.size());
                     StringBuilder result = new StringBuilder();
                     String prevHash = null;
-                    int count = 0;
                     for(EthLog.LogResult logResult : tempLogs) {
                         Log log = (Log) logResult.get();
                         String hash = log.getTransactionHash();
@@ -1025,7 +1029,6 @@ public class Game implements Runnable {
                                                 .append(currentTrxData.value).append("\n");
                                     }
                                 }
-                                last_bounty_hunter_bot.logsPrintStream.println("CSVMaker - Success : " + ++count);
                             } catch (Exception e) {
                                 e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                             }
@@ -1042,7 +1045,7 @@ public class Game implements Runnable {
                         }
                         FileOutputStream fileOutputStream = new FileOutputStream("list.csv");
                         PrintStream printStream = new PrintStream(fileOutputStream);
-                        printStream.println(result.toString());
+                        printStream.println(result);
                         printStream.close();
                         fileOutputStream.close();
                         last_bounty_hunter_bot.sendFile(chatId, "list.csv");
@@ -1062,8 +1065,12 @@ public class Game implements Runnable {
         }
     }
 
-    private void convertRTKLXIntoRTK(int X, String _amount, String chat_id) {
+    public void convertRTKLXIntoRTK(int X, String _amount, String chat_id) {
         BigInteger balance = getNetRTKWalletBalance(X);
+        if (_amount.equalsIgnoreCase("Max")) {
+            assert balance != null;
+            _amount = balance.toString();
+        }
         BigInteger amount = new BigInteger(_amount);
         assert (X >= 1 && X <= 5);
         assert balance != null;
@@ -1110,7 +1117,11 @@ public class Game implements Runnable {
             if(result) {
                 last_bounty_hunter_bot.sendMessage(chat_id, "Operation Successful");
                 return;
+            } else {
+                last_bounty_hunter_bot.logsPrintStream.println("Result of Convert Function Was False..");
             }
+        } else {
+            last_bounty_hunter_bot.logsPrintStream.println("Result of Approve was False...");
         }
 
         last_bounty_hunter_bot.sendMessage(chat_id, "Operation Unsuccessful. Check Logs");
