@@ -172,7 +172,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
             logsPrintStream.flush();
         }
         try {
-            fileOutputStream = new FileOutputStream("CustomLogsOutput.txt");
+            fileOutputStream = new FileOutputStream("LBH_OutPutLogs.txt");
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -571,7 +571,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                         logsPrintStream.flush();
                     }
                     try {
-                        fileOutputStream = new FileOutputStream("CustomLogsOutput.txt");
+                        fileOutputStream = new FileOutputStream("LBH_OutPutLogs.txt");
                     } catch (FileNotFoundException e) {
                         e.printStackTrace();
                     }
@@ -832,7 +832,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         SendDocument sendDocument = new SendDocument();
         sendDocument.setChatId(chatId);
         logsPrintStream.flush();
-        sendDocument.setDocument(new InputFile().setMedia(new File("CustomLogsOutput.txt")));
+        sendDocument.setDocument(new InputFile().setMedia(new File("LBH_OutPutLogs.txt")));
         sendDocument.setCaption("Lastest Logs");
         try {
             execute(sendDocument);

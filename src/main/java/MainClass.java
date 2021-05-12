@@ -49,10 +49,9 @@ public class MainClass {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static void disableAccessWarnings() {
         try {
-            Class unsafeClass = Class.forName("sun.misc.Unsafe");
+            Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
             Field field = unsafeClass.getDeclaredField("theUnsafe");
             field.setAccessible(true);
             Object unsafe = field.get(null);

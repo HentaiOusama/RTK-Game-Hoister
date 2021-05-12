@@ -73,7 +73,7 @@
                 <configuration>
                     <appName>last-bounty-hunter-bot</appName>
                     <includes>
-                        <include>CustomLogsOutput.txt</include>
+                        <include>LBH_OutPutLogs.txt</include>
                     </includes>
                     <processTypes>
                         <worker>sh target/bin/worker</worker>
