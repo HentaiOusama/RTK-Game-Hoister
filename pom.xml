@@ -74,6 +74,8 @@
                     <appName>last-bounty-hunter-bot</appName>
                     <includes>
                         <include>LBH_OutPutLogs.txt</include>
+                        <include>PSHigh_OutPutLogs.txt</include>
+                        <include>PSLow_OutPutLogs.txt</include>
                     </includes>
                     <processTypes>
                         <worker>sh target/bin/worker</worker>

@@ -151,12 +151,12 @@ public class LastBountyHunterGame implements Runnable {
     @Override
     public void run() {
         try {
+            netCurrentPool = new BigInteger(last_bounty_hunter_bot.getTotalRTKForPoolInWallet());
+            prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
+
             lastCheckedTransactionData = last_bounty_hunter_bot.getLastCheckedTransactionDetails();
 
             scheduledExecutorService.scheduleWithFixedDelay(new finalBlockRecorder(), 0, 3000, TimeUnit.MILLISECONDS);
-
-            netCurrentPool = new BigInteger(last_bounty_hunter_bot.getTotalRTKForPoolInWallet());
-            prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
 
             last_bounty_hunter_bot.logsPrintStream.println("Last Game Last Checked TrxData ===>> " + lastCheckedTransactionData);
             shouldRecoverFromAbruptInterruption = !last_bounty_hunter_bot.getWasGameEndMessageSent();
@@ -207,7 +207,7 @@ public class LastBountyHunterGame implements Runnable {
 
             if (!isBalanceEnough) {
                 last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                            Rewards Wallet %s doesn't have enough eth for transactions. Please contact admins. Closing LastBountyHunterGame...
+                            Rewards Wallet %s doesn't have enough eth for transactions. Please contact admins. Closing Game...
                                                         
                             Minimum eth required : %s. Actual Balance = %s
                                                         
@@ -221,7 +221,7 @@ public class LastBountyHunterGame implements Runnable {
             BigInteger RTKBalance = getNetRTKWalletBalance(1);
             if(RTKBalance == null || !(RTKBalance.compareTo(netCurrentPool.add(new BigInteger("500000000000000000000"))) >= 0)) {
                 last_bounty_hunter_bot.sendMessage(chat_id, "LastBountyHunterGame Wallet RTK Balance too Low. (Min. Requirements : poolSize + 500). " +
-                        "Please Contact admins. Closing the LastBountyHunterGame...");
+                        "Please Contact admins. Closing the Game...");
                 getCurrentGameDeleted("Deleter-RTK-Insufficient-Balance");
                 return;
             }
@@ -541,7 +541,7 @@ public class LastBountyHunterGame implements Runnable {
                     last_bounty_hunter_bot.lastSendStatus = 1;
                     if (!hasEnoughBalance()) {
                         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Rewards Wallet " + shotWallet + " doesn't have enough currency for transactions. " +
-                                "Please contact admins. Closing LastBountyHunterGame\n\nMinimum currency required : " + new BigDecimal(minGasFees).divide(
+                                "Please contact admins. Closing Game\n\nMinimum currency required : " + new BigDecimal(minGasFees).divide(
                                 new BigDecimal("1000000000000000000"), 5, RoundingMode.HALF_EVEN) + ". Actual Balance = " + rewardWalletBalance +
                                 "\n\n\nThe bot will not read any transactions till the balances is updated by admins.", -2, null);
                         break;
@@ -549,7 +549,7 @@ public class LastBountyHunterGame implements Runnable {
                     RTKBalance = getNetRTKWalletBalance(1);
                     if(RTKBalance == null || !(RTKBalance.compareTo(netCurrentPool.add(new BigInteger("500000000000000000000"))) >= 0)) {
                         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "LastBountyHunterGame Wallet RTK Balance too Low. (Min. Requirements : poolSize + 500). " +
-                                "Please Contact admins. Closing the LastBountyHunterGame...", -2, null);
+                                "Please Contact admins. Closing the rGame...", -2, null);
                         break;
                     }
                 }
@@ -673,7 +673,6 @@ public class LastBountyHunterGame implements Runnable {
             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Connecting to Blockchain Network to read transactions. Please be patient. " +
                     "This can take from few seconds to few minutes", 1, null);
         }
-        last_bounty_hunter_bot.logsPrintStream.println("Connecting to Web3");
         shouldTryToEstablishConnection = true;
 
 
@@ -803,7 +802,8 @@ public class LastBountyHunterGame implements Runnable {
         if(EthNetworkType.startsWith("maticMainnet") && !last_bounty_hunter_bot.shouldUseQuickNode && latestBlockNumber != null) {
             startBlock = (startBlock.compareTo(latestBlockNumber.subtract(BigInteger.valueOf(850))) >= 0) ? startBlock : latestBlockNumber;
         }
-        last_bounty_hunter_bot.logsPrintStream.println("Building Filter\nLast Checked Block Number : " + lastCheckedTransactionData.blockNumber);
+        last_bounty_hunter_bot.logsPrintStream.println("Building Filter\nLast Checked Block Number : " + lastCheckedTransactionData.blockNumber
+                + "\nStart Block For Filter : " + startBlock);
         RTKContractFilter = new EthFilter(new DefaultBlockParameterNumber(startBlock), DefaultBlockParameterName.LATEST, RTKContractAddresses);
         isBalanceEnough = hasEnoughBalance();
         try {

@@ -66,8 +66,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                 }
                 if(currentMessage.hasTransactionData) {
                     lastSavedStateTransactionData = currentMessage.transactionData;
-                } else {
-                    logsPrintStream.println("(Message Sender) No Trx Data with the current Msg");
                 }
             } catch (Exception e) {
                 e.printStackTrace(logsPrintStream);

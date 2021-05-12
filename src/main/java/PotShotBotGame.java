@@ -1,3 +1,4 @@
+import Supporting_Classes.PSB_LastGameState;
 import Supporting_Classes.ProxyIP;
 import Supporting_Classes.TransactionData;
 import Supporting_Classes.WebSocketService;
@@ -29,9 +30,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.net.*;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -88,6 +86,7 @@ public class PotShotBotGame implements Runnable {
     private final ScheduledExecutorService scheduledExecutorService2 = Executors.newSingleThreadScheduledExecutor();
     private int connectionCount = 0;
     private volatile boolean allowConnector = true;
+    private final boolean shouldSendNotificationToMainRTKChat;
     private boolean isBalanceEnough = false;
 
     private final String EthNetworkType, shotWallet;
@@ -111,12 +110,31 @@ public class PotShotBotGame implements Runnable {
         this.shotWallet = shotWallet;
         this.RTKContractAddresses = Arrays.asList(RTKContractAddresses);
         this.shotCost = shotCost;
+        shouldSendNotificationToMainRTKChat = EthNetworkType.toLowerCase().contains("mainnet");
     }
 
     @Override
     public void run() {
+        netCurrentPool = new BigInteger(pot_shot_bot.getTotalRTKForPoolInWallet());
+        prizePool = netCurrentPool.divide(BigInteger.valueOf(2));
+
+        try {
+            PSB_LastGameState psb_lastGameState = pot_shot_bot.getLastGameState();
+            lastCheckedTransactionData = psb_lastGameState.lastCheckedTransactionData;
+            prevHash = lastCheckedTransactionData.trxHash;
+            last3CountedHash = psb_lastGameState.last3CountedHash;
+        } catch (Exception e) {
+            e.printStackTrace(pot_shot_bot.logsPrintStream);
+        }
+
+        pot_shot_bot.logsPrintStream.println("Last Game Last Checked TrxData ===>> " + lastCheckedTransactionData);
+
         if(!buildCustomBlockchainReader(true)) {
-            System.out.println("Errorrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr");
+            pot_shot_bot.sendMessage(chat_id, "Error encountered while trying to connect to ethereum network. Cancelling the " +
+                    "lastBountyHunterGame.");
+
+            getCurrentGameDeleted("Deleter-Failed-Initial-Blockchain-Connect-Attempt");
+            return;
         }
 
         if (!isBalanceEnough) {
@@ -156,11 +174,18 @@ public class PotShotBotGame implements Runnable {
                     if (transactionData.didBurn) {
                         pot_shot_bot.enqueueMessageForSend(chat_id, String.format("""
                                         Hash :- %s
-                                        💥🔫 Gotcha! Hunter %s has the bounty now. Shoot 'em down before they claim it.
-                                        💰 Bounty: %s""", trimHashAndAddy(transactionData.trxHash), trimHashAndAddy(transactionData.fromAddress),
+                                        Hunter %s got shot and claimed the pot.
+                                        💰 Prize Amount : %s""", trimHashAndAddy(transactionData.trxHash), trimHashAndAddy(transactionData.fromAddress),
                                 getPrizePool()), transactionData, "https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
                                 "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
                                 "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
+
+                        if (shouldSendNotificationToMainRTKChat) {
+                            pot_shot_bot.enqueueMessageForSend(mainRuletkaChatID, String.format("""
+                                        Hunter %s got shot and claimed : %s
+                                        Check out the group @%s""", trimHashAndAddy(transactionData.fromAddress), getPrizePool(),
+                                    pot_shot_bot.getBotUsername()), transactionData);
+                        }
 
                         sendRewardToWinner(prizePool, transactionData.fromAddress);
                     } else {
@@ -178,6 +203,9 @@ public class PotShotBotGame implements Runnable {
         } catch (Exception e) {
             e.printStackTrace(pot_shot_bot.logsPrintStream);
         }
+
+        tryToSaveState();
+        getCurrentGameDeleted("Deleter-Run-END");
     }
     
 

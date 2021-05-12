@@ -124,7 +124,7 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
             logsPrintStream.flush();
         }
         try {
-            fileOutputStream = new FileOutputStream("PS_" + botType + "_OutPutLogs.txt");
+            fileOutputStream = new FileOutputStream("PS" + botType + "_OutPutLogs.txt");
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -257,6 +257,7 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
         }
     }
 
+    @SuppressWarnings("SpellCheckingInspection")
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && isAdmin(update.getMessage().getChatId()) && update.getMessage().hasText()) {
@@ -846,6 +847,7 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
         TransactionData transactionData = new TransactionData();
         transactionData.blockNumber = new BigInteger((String) foundWalletDetailDoc.get("lastCheckedBlockNumber"));
         transactionData.trxIndex = new BigInteger((String) foundWalletDetailDoc.get("lastCheckedTransactionIndex"));
+        transactionData.trxHash = (String) foundWalletDetailDoc.get("lastCheckedTrxHash");
         ArrayList<String> arrayList = new ArrayList<>();
         arrayList.add((String) foundWalletDetailDoc.get("lastCountedHash0"));
         arrayList.add((String) foundWalletDetailDoc.get("lastCountedHash1"));
