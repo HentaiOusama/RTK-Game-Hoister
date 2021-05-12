@@ -90,7 +90,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     String proxyUsername, proxyPassword;
     boolean shouldUseProxy, shouldUseQuickNode;
     private final ArrayList<ProxyIP> allProxies = new ArrayList<>();
-    private Instant lastGameEndTime;
+    private Instant lastGameEndTime = Instant.now();
 
     // Blockchain Related Stuff
     private String EthNetworkType;
@@ -951,16 +951,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         return (String) foundWalletDetailDoc.get("balanceCollectedAsFees");
     }
 
-    public TransactionData getLastCheckedTransactionDetails() {
-        TransactionData transactionData = new TransactionData();
-        Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
-        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
-        assert foundWalletDetailDoc != null;
-        transactionData.blockNumber = new BigInteger((String) foundWalletDetailDoc.get("lastCheckedBlockNumber"));
-        transactionData.trxIndex = new BigInteger((String) foundWalletDetailDoc.get("lastCheckedTransactionIndex"));
-        return transactionData;
-    }
-
     public void resetWasGameEndMessageSent() {
         Document botNameDoc = new Document("botName", botName);
         Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
@@ -975,6 +965,16 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
         assert foundBotNameDoc != null;
         return (boolean) foundBotNameDoc.get("wasGameEndMessageSent");
+    }
+
+    public TransactionData getLastCheckedTransactionDetails() {
+        TransactionData transactionData = new TransactionData();
+        Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
+        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+        assert foundWalletDetailDoc != null;
+        transactionData.blockNumber = new BigInteger((String) foundWalletDetailDoc.get("lastCheckedBlockNumber"));
+        transactionData.trxIndex = new BigInteger((String) foundWalletDetailDoc.get("lastCheckedTransactionIndex"));
+        return transactionData;
     }
 
     public LBH_LastGameState getLastGameState() {
@@ -995,28 +995,28 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         arrayList.add((String) foundBotNameDoc.get("lastCountedHash1"));
         arrayList.add((String) foundBotNameDoc.get("lastCountedHash2"));
         String endTime = (String) foundBotNameDoc.get("endTime");
-        LBH_LastGameState LBHLastGameState;
+        LBH_LastGameState lbh_lastGameState;
         try {
-            LBHLastGameState = new LBH_LastGameState(transactionData, Instant.parse(endTime), arrayList);
+            lbh_lastGameState = new LBH_LastGameState(transactionData, Instant.parse(endTime), arrayList);
         } catch (Exception e) {
-            LBHLastGameState = new LBH_LastGameState(transactionData, null, arrayList);
+            lbh_lastGameState = new LBH_LastGameState(transactionData, null, arrayList);
         }
         String msg = "\nPrevious State read :- \nTrxData -->";
-        if(LBHLastGameState.lastCheckedTransactionData != null) {
-            msg += LBHLastGameState.lastCheckedTransactionData.toString();
-            msg += ", Last 3 Trx Hash : " + LBHLastGameState.last3CountedHash;
+        if(lbh_lastGameState.lastCheckedTransactionData != null) {
+            msg += lbh_lastGameState.lastCheckedTransactionData.toString();
+            msg += ", Last 3 Trx Hash : " + lbh_lastGameState.last3CountedHash;
         } else {
             msg += "null";
         }
         msg += "\nEnd Time --> ";
-        if(LBHLastGameState.lastGameEndTime != null) {
-            msg += LBHLastGameState.lastGameEndTime.toString();
+        if(lbh_lastGameState.lastGameEndTime != null) {
+            msg += lbh_lastGameState.lastGameEndTime.toString();
         } else {
             msg += "null";
         }
         logsPrintStream.println(msg);
-        lastSavedStateTransactionData = LBHLastGameState.lastCheckedTransactionData;
-        return LBHLastGameState;
+        lastSavedStateTransactionData = lbh_lastGameState.lastCheckedTransactionData;
+        return lbh_lastGameState;
     }
 
     public void setLastCheckedTransactionDetails(TransactionData transactionData) {

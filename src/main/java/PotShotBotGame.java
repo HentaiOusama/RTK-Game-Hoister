@@ -403,7 +403,8 @@ public class PotShotBotGame implements Runnable {
 
     private void sendRewardToWinner(BigInteger amount, String toAddress) {
         try {
-            TransactionReceipt trxReceipt = ERC20.load(RTKContractAddresses.get(0), web3j, Credentials.create(System.getenv("PrivateKey")),
+            TransactionReceipt trxReceipt = ERC20.load(RTKContractAddresses.get(0), web3j, Credentials.create(
+                    System.getenv("PSB" + pot_shot_bot.botType.charAt(0) + "PrivateKey")),
                     new ContractGasProvider() {
                         @Override
                         public BigInteger getGasPrice(String s) {
@@ -440,6 +441,11 @@ public class PotShotBotGame implements Runnable {
         } catch (Exception e) {
             e.printStackTrace(pot_shot_bot.logsPrintStream);
         }
+    }
+
+    public void sendBountyUpdateMessage(BigInteger amount) {
+        pot_shot_bot.sendMessage(chat_id, "Bounty Increased...LastBountyHunterGame Host added " + getPrizePool(amount.divide(BigInteger.valueOf(2)))
+                + " to the current Bounty");
     }
     
     private String trimHashAndAddy(String string) {
@@ -540,6 +546,11 @@ public class PotShotBotGame implements Runnable {
         }
         pot_shot_bot.decreaseUndisposedGameCount();
         pot_shot_bot.logsPrintStream.println("Game Closed...");
+    }
+    
+    public void tryToSaveState() {
+        pot_shot_bot.setTotalRTKForPoolInWallet(netCurrentPool.toString());
+        pot_shot_bot.setLastCheckedTransactionDetails(lastCheckedTransactionData, last3CountedHash);
     }
 
 
