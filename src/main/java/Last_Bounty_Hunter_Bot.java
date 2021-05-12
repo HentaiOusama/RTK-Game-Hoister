@@ -21,6 +21,7 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import javax.print.Doc;
 import java.io.*;
 import java.math.BigInteger;
 import java.time.Duration;
@@ -102,7 +103,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     ArrayList<String> maticWebSocketUrls = new ArrayList<>();
     ArrayList<String> quickNodeWebSocketUrls = new ArrayList<>();
     ArrayList<String> etherWebSocketUrls = new ArrayList<>();
-    
 
     // MongoDB Related Stuff
     private final String botName = "Last Bounty Hunter Bot";
@@ -198,8 +198,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
 
         // Mongo Stuff
         ConnectionString connectionString = new ConnectionString(
-                "mongodb+srv://" + System.getenv("lastBountyHunterMonoID") + ":" +
-                        System.getenv("lastBountyHunterMonoPass") + "@hellgatesbotcluster.zm0r5.mongodb.net/test" +
+                "mongodb+srv://" + System.getenv("mongoID") + ":" +
+                        System.getenv("mongoPass") + "@hellgatesbotcluster.zm0r5.mongodb.net/test" +
                         "?keepAlive=true&poolSize=30&autoReconnect=true&socketTimeoutMS=360000&connectTimeoutMS=360000"
         );
         MongoClientSettings mongoClientSettings = MongoClientSettings.builder()
@@ -224,28 +224,26 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                 }
             }
             logsPrintStream.println("TopUpWalletAddress = " + topUpWalletAddress + "\nAdmins = " + allAdmins);
-            Document botNameDoc = new Document("botName", botName);
-            Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
-            assert foundBotNameDoc != null;
-            shouldRunGame = (boolean) foundBotNameDoc.get("shouldRunGame");
-            this.EthNetworkType = (String) foundBotNameDoc.get("EthNetworkType");
-            this.shotCost = new BigInteger((String) foundBotNameDoc.get("shotCost"));
-            proxyUsername = (String) foundBotNameDoc.get("proxyUsername");
-            proxyPassword = (String) foundBotNameDoc.get("proxyPassword");
-            if (foundBotNameDoc.get("proxyIP") instanceof List) {
-                for (int i = 0; i < (((List<?>) foundBotNameDoc.get("proxyIP")).size()); i++) {
-                    Object item = ((List<?>) foundBotNameDoc.get("proxyIP")).get(i);
+
+            Document botIndependetDoc = new Document("botName", "Bot Independent Data");
+            Document foundBotIndependentDoc = (Document) botControlCollection.find(botIndependetDoc).first();
+            assert foundBotIndependentDoc != null;
+            proxyUsername = (String) foundBotIndependentDoc.get("proxyUsername");
+            proxyPassword = (String) foundBotIndependentDoc.get("proxyPassword");
+            if (foundBotIndependentDoc.get("proxyIP") instanceof List) {
+                for (int i = 0; i < (((List<?>) foundBotIndependentDoc.get("proxyIP")).size()); i++) {
+                    Object item = ((List<?>) foundBotIndependentDoc.get("proxyIP")).get(i);
                     if (item instanceof String) {
                         allProxies.add(new ProxyIP(((String) item).trim().split(":")));
                     }
                 }
             }
-            String[] linkCounts = ((String) foundBotNameDoc.get("urlCounts")).trim().split(" ");
+            String[] linkCounts = ((String) foundBotIndependentDoc.get("urlCounts")).trim().split(" ");
             int maticCount = Integer.parseInt(linkCounts[0]);
             int QuickNodeCount = Integer.parseInt(linkCounts[1]);
-            if (foundBotNameDoc.get("urlList") instanceof List) {
-                for (int i = 0; i < (((List<?>) foundBotNameDoc.get("urlList")).size()); i++) {
-                    Object item = ((List<?>) foundBotNameDoc.get("urlList")).get(i);
+            if (foundBotIndependentDoc.get("urlList") instanceof List) {
+                for (int i = 0; i < (((List<?>) foundBotIndependentDoc.get("urlList")).size()); i++) {
+                    Object item = ((List<?>) foundBotIndependentDoc.get("urlList")).get(i);
                     if (item instanceof String) {
                         if(i == 0) {
                             maticPrefix = (String) item;
@@ -261,6 +259,13 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     }
                 }
             }
+
+            Document botNameDoc = new Document("botName", botName);
+            Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+            assert foundBotNameDoc != null;
+            shouldRunGame = (boolean) foundBotNameDoc.get("shouldRunGame");
+            this.EthNetworkType = (String) foundBotNameDoc.get("EthNetworkType");
+            this.shotCost = new BigInteger((String) foundBotNameDoc.get("shotCost"));
             shouldUseProxy = (boolean) foundBotNameDoc.get("shouldUseProxy");
             shouldUseQuickNode = (boolean) foundBotNameDoc.get("shouldUseQuickNode");
 
@@ -485,15 +490,15 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     }
                 }
                 else if (text.equalsIgnoreCase("rebuildWebSocketUrls")) {
-                    Document botNameDoc = new Document("botName", botName);
-                    Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
-                    assert foundBotNameDoc != null;
-                    String[] linkCounts = ((String) foundBotNameDoc.get("urlCounts")).trim().split(" ");
+                    Document botIndependetDoc = new Document("botName", "Bot Independent Data");
+                    Document foundBotIndependentDoc = (Document) botControlCollection.find(botIndependetDoc).first();
+                    assert foundBotIndependentDoc != null;
+                    String[] linkCounts = ((String) foundBotIndependentDoc.get("urlCounts")).trim().split(" ");
                     int maticCount = Integer.parseInt(linkCounts[0]);
                     int QuickNodeCount = Integer.parseInt(linkCounts[1]);
-                    if (foundBotNameDoc.get("urlList") instanceof List) {
-                        for (int i = 0; i < (((List<?>) foundBotNameDoc.get("urlList")).size()); i++) {
-                            Object item = ((List<?>) foundBotNameDoc.get("urlList")).get(i);
+                    if (foundBotIndependentDoc.get("urlList") instanceof List) {
+                        for (int i = 0; i < (((List<?>) foundBotIndependentDoc.get("urlList")).size()); i++) {
+                            Object item = ((List<?>) foundBotIndependentDoc.get("urlList")).get(i);
                             if (item instanceof String) {
                                 if(i == 0) {
                                     maticPrefix = (String) item;
@@ -636,32 +641,33 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                 }
                 else if (text.equalsIgnoreCase("Commands")) {
                     sendMessage(chatId, """
-                                runBot
-                                stopBot
-                                ActiveProcesses
-                                Switch to mainnet
-                                Switch to ropsten
-                                Switch to maticMainnet
-                                Switch to maticMumbai
-                                setPot amount
-                                getPot
-                                setShotCost amount
-                                getShotCost
-                                amountPulledOutFromFeesBalance amount
-                                getFeesBalance
-                                rebuildAdmins
-                                rebuildWebSocketUrls
-                                setTopUpWallet walletAddress
-                                resetWebSocketConnection
-                                setMessageFlow to boolean
-                                setShouldUseProxy to boolean
-                                setShouldUseQuickNode to boolean
-                                getLogs
-                                clearLogs
-                                getCSV X startBlock
-                                Commands
+                            runBot
+                            stopBot
+                            ActiveProcesses
+                            Switch to mainnet
+                            Switch to ropsten
+                            Switch to maticMainnet
+                            Switch to maticMumbai
+                            setPot amount
+                            getPot
+                            setShotCost amount
+                            getShotCost
+                            amountPulledOutFromFeesBalance amount
+                            getFeesBalance
+                            rebuildAdmins
+                            rebuildWebSocketUrls
+                            setTopUpWallet walletAddress
+                            resetWebSocketConnection
+                            setMessageFlow to boolean
+                            setShouldUseProxy to boolean
+                            setShouldUseQuickNode to boolean
+                            getLogs
+                            clearLogs
+                            getCSV X startBlock
+                            convertRTKLXIntoRTK X amount (amount can be a value or "Max")
+                            Commands
 
-                                (amount has to be bigInteger including 18 decimal eth precision)""");
+                            (amount has to be bigInteger including 18 decimal eth precision)""");
                 }
 
                 else {
@@ -672,7 +678,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
             }
             sendMessage(chatId, "shouldRunGame : " + shouldRunGame + "\nEthNetworkType : " + EthNetworkType +
                     "\nshouldAllowMessageFlow : " + shouldAllowMessageFlow + "\nshouldUseProxy : " + shouldUseProxy +
-                    "\nshouldUseQuickNode : " + shouldUseQuickNode +
+                    "\nshouldUseQuickNode : " + shouldUseQuickNode + "\ntopUpWalletAddress : " + topUpWalletAddress +
+                    "\nshotWallet : " + shotWallet +
                     "\nRTKContractAddresses :\n" + Arrays.toString(RTKContractAddresses));
         }
     }

@@ -33,8 +33,6 @@ import java.lang.reflect.Method;
 
 public class MainClass {
 
-    private static final String shotWallet = "0xdcCF6EE3977903d541B47F31D5bfD3AED3511C62";
-
     public static void main(String[] args) {
         BasicConfigurator.configure();
         disableAccessWarnings();
@@ -43,7 +41,7 @@ public class MainClass {
         // Starting Telegram bot and Web3 services
         try {
             TelegramBotsApi telegramBotsApi = new TelegramBotsApi(DefaultBotSession.class);
-            telegramBotsApi.registerBot(new Last_Bounty_Hunter_Bot(shotWallet));
+            telegramBotsApi.registerBot(new Last_Bounty_Hunter_Bot(System.getenv("LBHPublicKey")));
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -928,7 +928,7 @@ public class LastBountyHunterGame implements Runnable {
 
     private void sendRewardToWinner(BigInteger amount, String toAddress) {
         try {
-            TransactionReceipt trxReceipt = ERC20.load(RTKContractAddresses.get(0), web3j, Credentials.create(System.getenv("PrivateKey")),
+            TransactionReceipt trxReceipt = ERC20.load(RTKContractAddresses.get(0), web3j, Credentials.create(System.getenv("LBHPrivateKey")),
                     new ContractGasProvider() {
                         @Override
                         public BigInteger getGasPrice(String s) {
@@ -974,7 +974,7 @@ public class LastBountyHunterGame implements Runnable {
 
             String encodedFunction = FunctionEncoder.encode(function);
             org.web3j.protocol.core.methods.response.EthCall response = web3j.ethCall(
-                    org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(shotWallet, RTKContractAddresses.get(X -1),
+                    org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(shotWallet, RTKContractAddresses.get(X - 1),
                             encodedFunction), DefaultBlockParameterName.LATEST).send();
             List<Type> balances = FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
             finalValue = finalValue.add(new BigInteger(balances.get(0).getValue().toString()));
