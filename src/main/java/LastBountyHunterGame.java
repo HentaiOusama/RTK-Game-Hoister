@@ -96,7 +96,6 @@ public class LastBountyHunterGame implements Runnable {
         }
     }
 
-
     // Managing Variables
     Logger logger = Logger.getLogger(LastBountyHunterGame.class);
     volatile boolean isGameRunning = false, shouldContinueGame = true, didSomeoneGotShot = false, hasGameClosed = false;

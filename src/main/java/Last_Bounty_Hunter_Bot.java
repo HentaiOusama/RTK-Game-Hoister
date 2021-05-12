@@ -21,7 +21,6 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import javax.print.Doc;
 import java.io.*;
 import java.math.BigInteger;
 import java.time.Duration;
@@ -30,7 +29,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.*;
 
-@SuppressWarnings("SpellCheckingInspection")
+
 public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
 
     private class MessageSender implements Runnable {
@@ -46,16 +45,17 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                         makeChecks = lastSavedStateTransactionData != null &&
                                 currentMessage.transactionData.compareTo(lastSavedStateTransactionData) <= 0;
                     }
+                    if(!makeChecks) {
+                        Set<String> keys = currentlyActiveGames.keySet();
+                        for(String key : keys) {
+                            currentlyActiveGames.get(key).shouldRecoverFromAbruptInterruption = false;
+                        }
+                    }
                 }
                 if(makeChecks) {
                     logsPrintStream.println("Msg Failed Check Before Dispatch. Text : " + ((currentMessage.isMessage) ?
                             currentMessage.sendMessage.getText() : currentMessage.sendAnimation.getCaption()));
                     return;
-                } else {
-                    Set<String> keys = currentlyActiveGames.keySet();
-                    for(String key : keys) {
-                        currentlyActiveGames.get(key).shouldRecoverFromAbruptInterruption = false;
-                    }
                 }
                 if ((currentMessage.isMessage)) {
                     logsPrintStream.println("Msg Sender (Executor): " + currentMessage.sendMessage.getText());
@@ -114,9 +114,9 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     private final LinkedBlockingDeque<TelegramMessage> allPendingMessages = new LinkedBlockingDeque<>();
     private ExecutorService gameRunningExecutorService = Executors.newCachedThreadPool();
     private ScheduledExecutorService messageSendingExecutor = Executors.newSingleThreadScheduledExecutor();
-    private final ScheduledExecutorService logClearingExecutor = Executors.newSingleThreadScheduledExecutor();
 
 
+    @SuppressWarnings("SpellCheckingInspection")
     Last_Bounty_Hunter_Bot(String shotWallet) {
         this.shotWallet = shotWallet;
         Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -126,7 +126,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                 logsPrintStream.println("\n...Shutdown Handler Called ---> Initiating Graceful Shutdown...\n");
                 gameRunningExecutorService.shutdownNow();
                 messageSendingExecutor.shutdownNow();
-                logClearingExecutor.shutdownNow();
                 if(lastSavedStateTransactionData != null) {
                     Set<String> keys = currentlyActiveGames.keySet();
                     Document tempDoc = new Document();
@@ -209,7 +208,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         botControlCollection = mongoClient.getDatabase("All-Bots-Command-Centre").getCollection("MemberValues");
         walletDistributionCollection = mongoClient.getDatabase("Last-Bounty-Hunter-Bot-Database").getCollection("ManagingData");
 
-
         try {
             Document walletDetailDoc = new Document("identifier", "adminDetails");
             Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
@@ -225,8 +223,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
             }
             logsPrintStream.println("TopUpWalletAddress = " + topUpWalletAddress + "\nAdmins = " + allAdmins);
 
-            Document botIndependetDoc = new Document("botName", "Bot Independent Data");
-            Document foundBotIndependentDoc = (Document) botControlCollection.find(botIndependetDoc).first();
+            Document botIndependentDoc = new Document("botName", "Bot Independent Data");
+            Document foundBotIndependentDoc = (Document) botControlCollection.find(botIndependentDoc).first();
             assert foundBotIndependentDoc != null;
             proxyUsername = (String) foundBotIndependentDoc.get("proxyUsername");
             proxyPassword = (String) foundBotIndependentDoc.get("proxyPassword");
@@ -306,6 +304,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         }
     }
 
+    @SuppressWarnings("SpellCheckingInspection")
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && isAdmin(update.getMessage().getChatId()) && update.getMessage().hasText()) {
@@ -490,8 +489,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     }
                 }
                 else if (text.equalsIgnoreCase("rebuildWebSocketUrls")) {
-                    Document botIndependetDoc = new Document("botName", "Bot Independent Data");
-                    Document foundBotIndependentDoc = (Document) botControlCollection.find(botIndependetDoc).first();
+                    Document botIndependentDoc = new Document("botName", "Bot Independent Data");
+                    Document foundBotIndependentDoc = (Document) botControlCollection.find(botIndependentDoc).first();
                     assert foundBotIndependentDoc != null;
                     String[] linkCounts = ((String) foundBotIndependentDoc.get("urlCounts")).trim().split(" ");
                     int maticCount = Integer.parseInt(linkCounts[0]);
@@ -715,7 +714,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     }
 
 
-
+    @SuppressWarnings("SpellCheckingInspection")
     private void switchNetworks(String chatId, String from, String to) {
         if (from.equals(to)) {
             return;
@@ -840,7 +839,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         sendDocument.setChatId(chatId);
         logsPrintStream.flush();
         sendDocument.setDocument(new InputFile().setMedia(new File("LBH_OutPutLogs.txt")));
-        sendDocument.setCaption("Lastest Logs");
+        sendDocument.setCaption("Latest Logs");
         try {
             execute(sendDocument);
         } catch (Exception e) {
