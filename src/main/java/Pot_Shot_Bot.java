@@ -560,8 +560,6 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
                             setShouldUseQuickNode to boolean
                             getLogs
                             clearLogs
-                            getCSV X startBlock
-                            convertRTKLXIntoRTK X amount (amount can be a value or "Max")
                             Commands
 
                             (amount has to be bigInteger including 18 decimal eth precision)""");
@@ -583,7 +581,7 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
 
     @Override
     public String getBotUsername() {
-        return null;
+        return "HentaiOusamaTestBot";
     } // Not yet complete
 
     @Override

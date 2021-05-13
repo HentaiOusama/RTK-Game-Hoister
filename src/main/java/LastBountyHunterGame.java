@@ -274,9 +274,7 @@ public class LastBountyHunterGame implements Runnable {
                                         💰 Bounty: %s
                                         
                                         Checkout @Last_Bounty_Hunter_RTK group now and grab that bounty""",  trimHashAndAddy(finalBurnHash),
-                                        trimHashAndAddy(finalSender), getPrizePool()),3, transactionData,
-                                        "https://media.giphy.com/media/xaMURZrCVsFZzK6DnP/giphy.gif",
-                                        "https://media.giphy.com/media/UtXbAXl8Pt4Kr0f02Q/giphy.gif");
+                                        trimHashAndAddy(finalSender), getPrizePool()),3, transactionData);
                             }
                             didSomeoneGotShot = true;
                         } else {
@@ -371,10 +369,7 @@ public class LastBountyHunterGame implements Runnable {
                             if(shouldSendNotificationToMainRTKChat) {
                                 last_bounty_hunter_bot.enqueueMessageForSend(mainRuletkaChatID, msgString + """
                                                                                         
-                                            Checkout @Last_Bounty_Hunter_RTK group now and grab that bounty""", 4, null,
-                                        "https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
-                                        "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
-                                        "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
+                                            Checkout @Last_Bounty_Hunter_RTK group now and grab that bounty""", 4, null);
                             }
                         }
                         checkForStatus(4);
@@ -402,9 +397,10 @@ public class LastBountyHunterGame implements Runnable {
                                                     "remaining for the current round. Shoot hunter " + finalSender + " down before he claims the bounty!",
                                             -2, null);
                                     if(shouldSendNotificationToMainRTKChat) {
-                                        last_bounty_hunter_bot.enqueueMessageForSend(mainRuletkaChatID, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue +
-                                                " minutes remaining for the current round. Shoot hunter " + finalSender + " down before he claims " +
-                                                "the bounty!\n\nCheckout @Last_Bounty_Hunter_RTK group now and grab that bounty", -2, null);
+                                        last_bounty_hunter_bot.enqueueMessageForSend(mainRuletkaChatID, "Hurry up! 3/4th Time crossed. LESS THAN "
+                                                        + quarterValue + " minutes remaining for the current round. Shoot hunter " +
+                                                        trimHashAndAddy(finalSender) + " down before he claims the bounty!\n\nCheckout " +
+                                                        "@Last_Bounty_Hunter_RTK group now and grab that bounty", -2, null);
                                     }
                                     quarterWarn = false;
                                 }
@@ -520,7 +516,8 @@ public class LastBountyHunterGame implements Runnable {
                         last_bounty_hunter_bot.enqueueMessageForSend(mainRuletkaChatID, String.format("""
                                 %s – The Last Bounty Hunter – claimed the bounty and won %s.
                                 
-                                Checkout @Last_Bounty_Hunter_RTK group now to take part in new Bounty Hunting Round""", finalSender, getPrizePool()), 49, null);
+                                Checkout @Last_Bounty_Hunter_RTK group now to take part in new Bounty Hunting Round""", trimHashAndAddy(finalSender),
+                                getPrizePool()), 49, null);
                     }
                     sendRewardToWinner(prizePool, finalSender);
 
