@@ -106,8 +106,8 @@ public class LastBountyHunterGame implements Runnable {
     private final String chat_id;
     private volatile Instant currentRoundEndTime = null;
     private volatile BigInteger finalLatestBlockNumber = null;
-    private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
-    private final ScheduledExecutorService scheduledExecutorService2 = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService blockRecordingExecutorService = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService webSocketReconnectExecutorService = Executors.newSingleThreadScheduledExecutor();
     private int connectionCount = 0;
     private volatile boolean allowConnector = true;
     private final boolean shouldSendNotificationToMainRTKChat;
@@ -156,7 +156,7 @@ public class LastBountyHunterGame implements Runnable {
 
             lastCheckedTransactionData = last_bounty_hunter_bot.getLastCheckedTransactionDetails();
 
-            scheduledExecutorService.scheduleWithFixedDelay(new finalBlockRecorder(), 0, 3000, TimeUnit.MILLISECONDS);
+            blockRecordingExecutorService.scheduleWithFixedDelay(new finalBlockRecorder(), 0, 3000, TimeUnit.MILLISECONDS);
 
             last_bounty_hunter_bot.logsPrintStream.println("Last Game Last Checked TrxData ===>> " + lastCheckedTransactionData);
             shouldRecoverFromAbruptInterruption = !last_bounty_hunter_bot.getWasGameEndMessageSent();
@@ -227,7 +227,7 @@ public class LastBountyHunterGame implements Runnable {
                 return;
             }
 
-            scheduledExecutorService2.scheduleWithFixedDelay(new webSocketReconnect(), 0, 5000, TimeUnit.MILLISECONDS);
+            webSocketReconnectExecutorService.scheduleWithFixedDelay(new webSocketReconnect(), 0, 5000, TimeUnit.MILLISECONDS);
 
             checkForStatus(1);
             if (!last_bounty_hunter_bot.makeChecks) {
@@ -459,8 +459,8 @@ public class LastBountyHunterGame implements Runnable {
 
                         last_bounty_hunter_bot.logsPrintStream.println("End of Round " + roundCount);
 
-                        if (!scheduledExecutorService.isShutdown() && roundCount == 3) {
-                            scheduledExecutorService.shutdownNow();
+                        if (!blockRecordingExecutorService.isShutdown() && roundCount == 3) {
+                            blockRecordingExecutorService.shutdownNow();
                         }
 
                         if (furtherCountNecessary) {
@@ -623,11 +623,11 @@ public class LastBountyHunterGame implements Runnable {
         while (!last_bounty_hunter_bot.deleteGame(chat_id, this, deleterId)) {
             performProperWait(1.5);
         }
-        if (!scheduledExecutorService.isShutdown()) {
-            scheduledExecutorService.shutdownNow();
+        if (!blockRecordingExecutorService.isShutdown()) {
+            blockRecordingExecutorService.shutdownNow();
         }
-        if (!scheduledExecutorService2.isShutdown()) {
-            scheduledExecutorService2.shutdownNow();
+        if (!webSocketReconnectExecutorService.isShutdown()) {
+            webSocketReconnectExecutorService.shutdownNow();
         }
         hasGameClosed = true;
         last_bounty_hunter_bot.sendMessage(chat_id, "The bot has been shut down. Please don't send any transactions now.");

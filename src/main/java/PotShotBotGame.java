@@ -83,7 +83,7 @@ public class PotShotBotGame implements Runnable {
     volatile TransactionData lastCheckedTransactionData = null;
     private final Pot_Shot_Bot pot_shot_bot;
     private final String chat_id;
-    private final ScheduledExecutorService scheduledExecutorService2 = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService webSocketReconnectExecutorService = Executors.newSingleThreadScheduledExecutor();
     private int connectionCount = 0;
     private volatile boolean allowConnector = true;
     private final boolean shouldSendNotificationToMainRTKChat;
@@ -150,7 +150,7 @@ public class PotShotBotGame implements Runnable {
             return;
         }
 
-        scheduledExecutorService2.scheduleWithFixedDelay(new PotShotBotGame.webSocketReconnect(), 0, 5000, TimeUnit.MILLISECONDS);
+        webSocketReconnectExecutorService.scheduleWithFixedDelay(new PotShotBotGame.webSocketReconnect(), 0, 5000, TimeUnit.MILLISECONDS);
         
         try {
             String mainRuletkaChatID = "-1001303208172";
@@ -173,9 +173,10 @@ public class PotShotBotGame implements Runnable {
                     lastCheckedTransactionData = transactionData;
                     if (transactionData.didBurn) {
                         pot_shot_bot.enqueueMessageForSend(chat_id, String.format("""
-                                        Hash :- %s
+                                        Hash :- %s, X = %s
                                         Hunter %s got shot and claimed the pot.
-                                        💰 Prize Amount : %s""", trimHashAndAddy(transactionData.trxHash), trimHashAndAddy(transactionData.fromAddress),
+                                        💰 Prize Amount : %s""", trimHashAndAddy(transactionData.trxHash), transactionData.X,
+                                trimHashAndAddy(transactionData.fromAddress),
                                 getPrizePool()), transactionData, "https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
                                 "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
                                 "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
@@ -188,12 +189,13 @@ public class PotShotBotGame implements Runnable {
                         }
 
                         sendRewardToWinner(prizePool, transactionData.fromAddress);
+                        tryToSaveState();
                     } else {
                         addRTKToPot(transactionData.value, transactionData.fromAddress);
                         pot_shot_bot.enqueueMessageForSend(chat_id, String.format("""
-                                        Hash :- %s
+                                        Hash :- %s, X = %s
                                         🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
-                                        💰 Updated bounty: %s""", trimHashAndAddy(transactionData.trxHash),
+                                        💰 Updated bounty: %s""", trimHashAndAddy(transactionData.trxHash), transactionData.X,
                                 trimHashAndAddy(transactionData.fromAddress), getPrizePool()), transactionData,
                                 "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
                     }
@@ -358,21 +360,41 @@ public class PotShotBotGame implements Runnable {
                     Optional<Transaction> trx = web3j.ethGetTransactionByHash(hash).send().getTransaction();
                     if (trx.isPresent()) {
                         TransactionData currentTrxData = splitInputData(log, trx.get());
-                        boolean counted = !currentTrxData.methodName.equals("Useless") && currentTrxData.toAddress.equalsIgnoreCase(shotWallet)
-                                && currentTrxData.value.compareTo(shotCost) >= 0 && currentTrxData.compareTo(lastCheckedTransactionData) > 0;
-                        counted = counted && isNotOldHash(currentTrxData.trxHash);
+                        boolean f1, f2, f3, f4, f5;
+
+                        if (currentTrxData.methodName != null) {
+                            f1 = !currentTrxData.methodName.equals("Useless");
+                        } else {
+                            f1 = false;
+                        }
+                        if (currentTrxData.toAddress != null) {
+                            f2 = currentTrxData.toAddress.equalsIgnoreCase(shotWallet);
+                        } else {
+                            f2 = false;
+                        }
+                        if (currentTrxData.value != null) {
+                            f3 = currentTrxData.value.compareTo(shotCost) >= 0;
+                        } else {
+                            f3 = false;
+                        }
+
+                        f4 = currentTrxData.compareTo(lastCheckedTransactionData) > 0;
+                        f5 = isNotOldHash(currentTrxData.trxHash);
+
+                        boolean counted = f1 && f2 && f3 && f4 && f5;
                         
                         if (counted) {
                             pot_shot_bot.logsPrintStream.println("Chat ID : " + chat_id + " ===>> " + currentTrxData +
                                     ", PrevHash : " + prevHash + ", Was Counted = " + true);
                             validTransactions.add(currentTrxData);
                             pushTransaction(currentTrxData.trxHash);
+                            prevHash = hash;
                         } else {
-                            pot_shot_bot.logsPrintStream.println("Ignored Incoming Hash : " + currentTrxData.trxHash);
+                            pot_shot_bot.logsPrintStream.println("Ignored Incoming Hash : " + currentTrxData.trxHash + ", Reason : \n" +
+                                    f1 + ", " + f2 +  ", " + f3 + ", " + f4 + ", " + f5);
                         }
                     }
                 }
-                prevHash = hash;
             }, throwable -> {
                 pot_shot_bot.logsPrintStream.println("Disposable Internal Error (Throwable)");
                 throwable.printStackTrace(pot_shot_bot.logsPrintStream);
@@ -549,8 +571,8 @@ public class PotShotBotGame implements Runnable {
         while (!pot_shot_bot.deleteGame(chat_id, this, deleterId)) {
             performProperWait(1.5);
         }
-        if (!scheduledExecutorService2.isShutdown()) {
-            scheduledExecutorService2.shutdownNow();
+        if (!webSocketReconnectExecutorService.isShutdown()) {
+            webSocketReconnectExecutorService.shutdownNow();
         }
         hasGameClosed = true;
         pot_shot_bot.sendMessage(chat_id, "The bot has been shut down. Please don't send any transactions now.");
