@@ -810,17 +810,25 @@ public class LastBountyHunterGame implements Runnable {
                     Optional<Transaction> trx = web3j.ethGetTransactionByHash(hash).send().getTransaction();
                     if (trx.isPresent()) {
                         TransactionData currentTrxData = splitInputData(log, trx.get());
-                        boolean counted = !currentTrxData.methodName.equals("Useless") && currentTrxData.toAddress.equalsIgnoreCase(shotWallet)
-                                && currentTrxData.value.compareTo(shotCost) >= 0 && currentTrxData.compareTo(lastCheckedTransactionData) > 0;
+                        boolean f1 = !currentTrxData.methodName.equals("Useless");
+                        boolean f2 = f1 && currentTrxData.toAddress.equalsIgnoreCase(shotWallet);
+                        boolean f3 = f2 && currentTrxData.value.compareTo(shotCost) >= 0;
+                        boolean f4 = f3 && currentTrxData.compareTo(lastCheckedTransactionData) > 0;
+                        boolean f5 = isNotOldHash(currentTrxData.trxHash);
+                        int blockId = -1;
+
+                        boolean counted = f4;
 
                         if(abruptRecoveryComplete) {
-                            counted = counted && isNotOldHash(currentTrxData.trxHash);
+                            counted = counted && f5;
                         } else {
                             if(currentTrxData.compareTo(last_bounty_hunter_bot.lastSavedStateTransactionData) == 0) {
                                 abruptRecoveryComplete = true;
+                                blockId = 0;
                             } else if (currentTrxData.compareTo(last_bounty_hunter_bot.lastSavedStateTransactionData) > 0) {
                                 abruptRecoveryComplete = true;
-                                counted = counted && isNotOldHash(currentTrxData.trxHash);
+                                counted = counted && f5;
+                                blockId = 1;
                             }
                         }
                         if (counted) {
@@ -829,7 +837,8 @@ public class LastBountyHunterGame implements Runnable {
                             validTransactions.add(currentTrxData);
                             pushTransaction(currentTrxData.trxHash);
                         } else {
-                            last_bounty_hunter_bot.logsPrintStream.println("Ignored Incoming Hash : " + currentTrxData.trxHash);
+                            last_bounty_hunter_bot.logsPrintStream.println("Ignored Incoming Hash : " + currentTrxData.trxHash + "Reason : \n" +
+                                    f1 + ", " + f2 +  ", " + f3 + ", " + f4 + ", " + f5 + ", blockId : " + blockId);
                         }
                     }
                 }
