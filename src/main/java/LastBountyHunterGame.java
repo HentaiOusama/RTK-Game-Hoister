@@ -194,6 +194,7 @@ public class LastBountyHunterGame implements Runnable {
             last_bounty_hunter_bot.resetWasGameEndMessageSent();
 
             String finalSender = null, finalBurnHash = null;
+            int X = 0;
             boolean halfWarn, quarterWarn;
             int halfValue, quarterValue;
 
@@ -257,33 +258,34 @@ public class LastBountyHunterGame implements Runnable {
                         if (transactionData.didBurn) {
                             finalSender = transactionData.fromAddress;
                             finalBurnHash = transactionData.trxHash;
+                            X = transactionData.X;
                             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                                         💥🔫 First blood!!!
-                                        Hash :- %s
+                                        Hash :- %s, X = %s
                                         Hunter %s has the bounty. Shoot him down before he claims it.
                                         ⏱ Time limit: 30 minutes
-                                        💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), trimHashAndAddy(finalSender), getPrizePool()),
+                                        💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), X, trimHashAndAddy(finalSender), getPrizePool()),
                                     3, transactionData,"https://media.giphy.com/media/xaMURZrCVsFZzK6DnP/giphy.gif",
                                     "https://media.giphy.com/media/UtXbAXl8Pt4Kr0f02Q/giphy.gif");
                             if(shouldSendNotificationToMainRTKChat) {
                                 last_bounty_hunter_bot.enqueueMessageForSend(mainRuletkaChatID, String.format("""
                                         💥🔫 First blood!!!
-                                        Hash :- %s
+                                        Hash :- %s, X = %s
                                         Hunter %s has the bounty. Shoot him down before he claims it.
                                         ⏱ Time limit: 30 minutes
                                         💰 Bounty: %s
                                         
-                                        Checkout @Last_Bounty_Hunter_RTK group now and grab that bounty""",  trimHashAndAddy(finalBurnHash),
+                                        Checkout @Last_Bounty_Hunter_RTK group now and grab that bounty""",  trimHashAndAddy(finalBurnHash), X,
                                         trimHashAndAddy(finalSender), getPrizePool()),3, transactionData);
                             }
                             didSomeoneGotShot = true;
                         } else {
                             addRTKToPot(transactionData.value, transactionData.fromAddress);
                             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                                        Hash :- %s
+                                        Hash :- %s, X = %s
                                         \uD83D\uDD2B Close shot! Hunter %s tried to get the bounty, but missed their shot.
 
-                                        Updated Bounty : %s""", trimHashAndAddy(transactionData.trxHash),
+                                        Updated Bounty : %s""", trimHashAndAddy(transactionData.trxHash), transactionData.X,
                                     trimHashAndAddy(transactionData.fromAddress), getPrizePool()), 2, transactionData,
                                     "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
                         }
@@ -294,8 +296,8 @@ public class LastBountyHunterGame implements Runnable {
                         continue;
                     }
 
-
                     isGameRunning = true;
+
                     for (int roundCount = 1; roundCount <= 3; roundCount++) {
                         didSomeoneGotShot = false;
                         Instant currentRoundHalfTime, currentRoundQuarterTime;
@@ -335,10 +337,10 @@ public class LastBountyHunterGame implements Runnable {
                             quarterValue = 5;
                             msgString = String.format("""
                                 💥🔫 Gotcha! Round 2 started
-                                Hash :- %s
+                                Hash :- %s, X = %s
                                 Hunter %s has the bounty now. Shoot him down before he claims it.
                                 ⏱ Time limit: 20 minutes
-                                💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), trimHashAndAddy(finalSender), getPrizePool());
+                                💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), X, trimHashAndAddy(finalSender), getPrizePool());
                         } else {
                             if (shouldRecoverFromAbruptInterruption && lastGameEndTime != null && Instant.now().compareTo(lastGameEndTime) <= 0) {
                                 currentRoundEndTime = lastGameEndTime;
@@ -355,10 +357,10 @@ public class LastBountyHunterGame implements Runnable {
                             quarterValue = 3;
                             msgString = String.format("""
                                 💥🔫 Gotcha! Round 3 started
-                                Hash :- %s
+                                Hash :- %s, X = %s
                                 Hunter %s has the bounty now. Shoot him down before he claims it.
                                 ⏱ Time limit: 10 minutes
-                                💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), trimHashAndAddy(finalSender), getPrizePool());
+                                💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), X, trimHashAndAddy(finalSender), getPrizePool());
                         }
                         boolean furtherCountNecessary = true;
                         if (msgString != null) {
@@ -418,15 +420,16 @@ public class LastBountyHunterGame implements Runnable {
                                     if (transactionData.didBurn) {
                                         finalSender = transactionData.fromAddress;
                                         finalBurnHash = transactionData.trxHash;
+                                        X = transactionData.X;
                                         if (roundCount != 3) {
                                             furtherCountNecessary = false;
                                             break MID;
                                         } else {
                                             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                                                        Hash :- %s
+                                                        Hash :- %s, X = %s
                                                         💥🔫 Gotcha! Hunter %s has the bounty now. Shoot 'em down before they claim it.
                                                         ⏱ Remaining time: LESS THAN %d minutes
-                                                        💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), trimHashAndAddy(finalSender),
+                                                        💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), X, trimHashAndAddy(finalSender),
                                                     Duration.between(Instant.now(), currentRoundEndTime).toMinutes(),
                                                     getPrizePool()), 5, transactionData,
                                                     "https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
@@ -437,10 +440,10 @@ public class LastBountyHunterGame implements Runnable {
                                     } else {
                                         addRTKToPot(transactionData.value, transactionData.fromAddress);
                                         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                                                    Hash :- %s
+                                                    Hash :- %s, X = %s
                                                     🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
                                                     The bounty will be claimed in LESS THAN %s minutes.
-                                                    💰 Updated bounty: %s""", trimHashAndAddy(transactionData.trxHash),
+                                                    💰 Updated bounty: %s""", trimHashAndAddy(transactionData.trxHash), transactionData.X,
                                                 trimHashAndAddy(transactionData.fromAddress),
                                                 Duration.between(Instant.now(), currentRoundEndTime).toMinutes(), getPrizePool()), 5,
                                                 transactionData,"https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
@@ -456,7 +459,7 @@ public class LastBountyHunterGame implements Runnable {
 
                         last_bounty_hunter_bot.logsPrintStream.println("End of Round " + roundCount);
 
-                        if (!scheduledExecutorService.isShutdown()) {
+                        if (!scheduledExecutorService.isShutdown() && roundCount == 3) {
                             scheduledExecutorService.shutdownNow();
                         }
 
@@ -477,13 +480,14 @@ public class LastBountyHunterGame implements Runnable {
                                     if (transactionData.didBurn) {
                                         finalSender = transactionData.fromAddress;
                                         finalBurnHash = transactionData.trxHash;
+                                        X = transactionData.X;
                                         didSomeoneGotShot = true;
                                     } else {
                                         addRTKToPot(transactionData.value, transactionData.fromAddress);
                                         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                                                    Hash :- %s
+                                                    Hash :- %s, X = %s
                                                     🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
-                                                    💰 Updated bounty: %s""", trimHashAndAddy(transactionData.trxHash),
+                                                    💰 Updated bounty: %s""", trimHashAndAddy(transactionData.trxHash), transactionData.X,
                                                 trimHashAndAddy(transactionData.fromAddress), getPrizePool()), 5, transactionData,
                                                 "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
                                     }
@@ -493,12 +497,12 @@ public class LastBountyHunterGame implements Runnable {
                                 }
                             }
                             currentRoundEndTime = null;
-                            if (!didSomeoneGotShot) {
-                                break;
-                            }
                             if (shouldRecoverFromAbruptInterruption) {
                                 shouldRecoverFromAbruptInterruption = lastCheckedTransactionData.compareTo(
                                         last_bounty_hunter_bot.lastSavedStateTransactionData) < 0;
+                            }
+                            if (!didSomeoneGotShot) {
+                                break;
                             }
                         }
                     }
@@ -506,8 +510,8 @@ public class LastBountyHunterGame implements Runnable {
 
                     last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                         Final valid burn :-
-                        Trx Hash : %s
-                        Final pot holder : %s""", finalBurnHash, finalSender), 6, null);
+                        Trx Hash : %s, X = %s
+                        Final pot holder : %s""", finalBurnHash, X, finalSender), 6, null);
                     last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                                 “Ever notice how you come across somebody once in a while you should not have messed with? That’s me.”
                                 %s – The Last Bounty Hunter – claimed the bounty and won %s.""", finalSender, getPrizePool()), 49, null,
@@ -810,14 +814,29 @@ public class LastBountyHunterGame implements Runnable {
                     Optional<Transaction> trx = web3j.ethGetTransactionByHash(hash).send().getTransaction();
                     if (trx.isPresent()) {
                         TransactionData currentTrxData = splitInputData(log, trx.get());
-                        boolean f1 = !currentTrxData.methodName.equals("Useless");
-                        boolean f2 = f1 && currentTrxData.toAddress.equalsIgnoreCase(shotWallet);
-                        boolean f3 = f2 && currentTrxData.value.compareTo(shotCost) >= 0;
-                        boolean f4 = f3 && currentTrxData.compareTo(lastCheckedTransactionData) > 0;
-                        boolean f5 = isNotOldHash(currentTrxData.trxHash);
+                        boolean f1, f2, f3, f4, f5;
+
+                        if (currentTrxData.methodName != null) {
+                            f1 = !currentTrxData.methodName.equals("Useless");
+                        } else {
+                            f1 = false;
+                        }
+                        if (currentTrxData.toAddress != null) {
+                            f2 = currentTrxData.toAddress.equalsIgnoreCase(shotWallet);
+                        } else {
+                            f2 = false;
+                        }
+                        if (currentTrxData.value != null) {
+                            f3 = currentTrxData.value.compareTo(shotCost) >= 0;
+                        } else {
+                            f3 = false;
+                        }
+
+                        f4 = currentTrxData.compareTo(lastCheckedTransactionData) > 0;
+                        f5 = isNotOldHash(currentTrxData.trxHash);
                         int blockId = -1;
 
-                        boolean counted = f4;
+                        boolean counted = f1 && f2 && f3 && f4;
 
                         if(abruptRecoveryComplete) {
                             counted = counted && f5;
@@ -836,13 +855,13 @@ public class LastBountyHunterGame implements Runnable {
                                     ", PrevHash : " + prevHash + ", Was Counted = " + true);
                             validTransactions.add(currentTrxData);
                             pushTransaction(currentTrxData.trxHash);
+                            prevHash = hash;
                         } else {
-                            last_bounty_hunter_bot.logsPrintStream.println("Ignored Incoming Hash : " + currentTrxData.trxHash + "Reason : \n" +
+                            last_bounty_hunter_bot.logsPrintStream.println("Ignored Incoming Hash : " + currentTrxData.trxHash + ", Reason : \n" +
                                     f1 + ", " + f2 +  ", " + f3 + ", " + f4 + ", " + f5 + ", blockId : " + blockId);
                         }
                     }
                 }
-                prevHash = hash;
             }, throwable -> {
                 last_bounty_hunter_bot.logsPrintStream.println("Disposable Internal Error (Throwable)");
                 throwable.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
