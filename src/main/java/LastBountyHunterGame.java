@@ -506,7 +506,7 @@ public class LastBountyHunterGame implements Runnable {
 
                     last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                         Final valid burn :-
-                        Trx Hash :%s
+                        Trx Hash : %s
                         Final pot holder : %s""", finalBurnHash, finalSender), 6, null);
                     last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                                 “Ever notice how you come across somebody once in a while you should not have messed with? That’s me.”

@@ -44,6 +44,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     if(currentMessage.hasTransactionData) {
                         makeChecks = lastSavedStateTransactionData != null &&
                                 currentMessage.transactionData.compareTo(lastSavedStateTransactionData) <= 0;
+                    } else if (currentMessage.sendStatus == 6) {
+                        makeChecks = false;
                     }
                     if(!makeChecks) {
                         Set<String> keys = currentlyActiveGames.keySet();
