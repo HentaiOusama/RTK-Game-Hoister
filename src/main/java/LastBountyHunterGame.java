@@ -3,6 +3,7 @@ import Supporting_Classes.ProxyIP;
 import Supporting_Classes.TransactionData;
 import Supporting_Classes.WebSocketService;
 import io.reactivex.disposables.Disposable;
+import jnr.ffi.annotations.In;
 import org.apache.log4j.Logger;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.FunctionReturnDecoder;
@@ -258,7 +259,7 @@ public class LastBountyHunterGame implements Runnable {
                         if (transactionData.didBurn) {
                             finalSender = transactionData.fromAddress;
                             finalBurnHash = transactionData.trxHash;
-                            X = transactionData.X;
+                            X = (transactionData.X + 1);
                             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                                         💥🔫 First blood!!!
                                         Hash :- %s, X = %s
@@ -285,7 +286,7 @@ public class LastBountyHunterGame implements Runnable {
                                         Hash :- %s, X = %s
                                         \uD83D\uDD2B Close shot! Hunter %s tried to get the bounty, but missed their shot.
 
-                                        Updated Bounty : %s""", trimHashAndAddy(transactionData.trxHash), transactionData.X,
+                                        Updated Bounty : %s""", trimHashAndAddy(transactionData.trxHash), (transactionData.X + 1),
                                     trimHashAndAddy(transactionData.fromAddress), getPrizePool()), 2, transactionData,
                                     "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
                         }
@@ -420,7 +421,7 @@ public class LastBountyHunterGame implements Runnable {
                                     if (transactionData.didBurn) {
                                         finalSender = transactionData.fromAddress;
                                         finalBurnHash = transactionData.trxHash;
-                                        X = transactionData.X;
+                                        X = (transactionData.X + 1);
                                         if (roundCount != 3) {
                                             furtherCountNecessary = false;
                                             break MID;
@@ -443,7 +444,7 @@ public class LastBountyHunterGame implements Runnable {
                                                     Hash :- %s, X = %s
                                                     🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
                                                     The bounty will be claimed in LESS THAN %s minutes.
-                                                    💰 Updated bounty: %s""", trimHashAndAddy(transactionData.trxHash), transactionData.X,
+                                                    💰 Updated bounty: %s""", trimHashAndAddy(transactionData.trxHash), (transactionData.X + 1),
                                                 trimHashAndAddy(transactionData.fromAddress),
                                                 Duration.between(Instant.now(), currentRoundEndTime).toMinutes(), getPrizePool()), 5,
                                                 transactionData,"https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
@@ -480,14 +481,14 @@ public class LastBountyHunterGame implements Runnable {
                                     if (transactionData.didBurn) {
                                         finalSender = transactionData.fromAddress;
                                         finalBurnHash = transactionData.trxHash;
-                                        X = transactionData.X;
+                                        X = (transactionData.X + 1);
                                         didSomeoneGotShot = true;
                                     } else {
                                         addRTKToPot(transactionData.value, transactionData.fromAddress);
                                         last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                                                     Hash :- %s, X = %s
                                                     🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
-                                                    💰 Updated bounty: %s""", trimHashAndAddy(transactionData.trxHash), transactionData.X,
+                                                    💰 Updated bounty: %s""", trimHashAndAddy(transactionData.trxHash), (transactionData.X + 1),
                                                 trimHashAndAddy(transactionData.fromAddress), getPrizePool()), 5, transactionData,
                                                 "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
                                     }
@@ -862,6 +863,7 @@ public class LastBountyHunterGame implements Runnable {
                         }
                     }
                 }
+                last_bounty_hunter_bot.lastMomentWhenTrxWasRead = Instant.now();
             }, throwable -> {
                 last_bounty_hunter_bot.logsPrintStream.println("Disposable Internal Error (Throwable)");
                 throwable.printStackTrace(last_bounty_hunter_bot.logsPrintStream);

@@ -8,6 +8,7 @@ import com.mongodb.client.ClientSession;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
+import jnr.ffi.annotations.In;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.jetbrains.annotations.Nullable;
@@ -91,6 +92,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     boolean shouldUseProxy, shouldUseQuickNode;
     private final ArrayList<ProxyIP> allProxies = new ArrayList<>();
     private Instant lastGameEndTime = Instant.now();
+    volatile Instant lastMomentWhenTrxWasRead = Instant.now(), lastMomentFromCommandUse = Instant.now().minus(55, ChronoUnit.MINUTES);
 
     // Blockchain Related Stuff
     private String EthNetworkType;
@@ -680,6 +682,42 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     "\nshouldUseQuickNode : " + shouldUseQuickNode + "\ntopUpWalletAddress : " + topUpWalletAddress +
                     "\nshotWallet : " + shotWallet +
                     "\nRTKContractAddresses :\n" + Arrays.toString(RTKContractAddresses));
+        }
+        else if (update.hasMessage() && update.getMessage().hasText()) {
+            String chatId = update.getMessage().getChatId().toString();
+            String text = update.getMessage().getText();
+
+            if (text.equalsIgnoreCase("/checkForTrx") || text.equalsIgnoreCase("/checkForTrx@" + getBotUsername())) {
+                String msg = "Faliure.";
+
+                if (Instant.now().compareTo(lastMomentFromCommandUse.plus(2, ChronoUnit.HOURS)) >= 0) {
+                    try {
+                        Thread.sleep(500);
+                    } catch (Exception e) {
+                        e.printStackTrace(logsPrintStream);
+                    }
+                    if (Instant.now().compareTo(lastMomentWhenTrxWasRead.plus(30, ChronoUnit.MINUTES)) >= 0) {
+                        Set<String> keys = currentlyActiveGames.keySet();
+                        if (keys.size() != 0) {
+                            for (String key : keys) {
+                                LastBountyHunterGame lastBountyHunterGame = currentlyActiveGames.get(key);
+                                lastBountyHunterGame.setShouldTryToEstablishConnection();
+                            }
+                            msg = "Success";
+                        } else {
+                            msg += " No active Games";
+                        }
+                    } else {
+                        msg += " It seems the bot the reading the transactions. If you still think this is an error, please contact " +
+                                "any administrator to look into the issue.";
+                    }
+                    lastMomentFromCommandUse = Instant.now();
+                } else {
+                    msg += " This command can only be used once every 90 minutes. If there are any issues with the games, please " +
+                            "contact any administrator to look into the issue.";
+                }
+                enqueueMessageForSend(chatId, msg, -2, null);
+            }
         }
     }
 
