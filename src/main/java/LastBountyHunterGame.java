@@ -3,7 +3,6 @@ import Supporting_Classes.ProxyIP;
 import Supporting_Classes.TransactionData;
 import Supporting_Classes.WebSocketService;
 import io.reactivex.disposables.Disposable;
-import jnr.ffi.annotations.In;
 import org.apache.log4j.Logger;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.FunctionReturnDecoder;
@@ -17,6 +16,7 @@ import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.contracts.eip20.generated.ERC20;
 import org.web3j.crypto.Credentials;
 import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.DefaultBlockParameterNumber;
 import org.web3j.protocol.core.methods.request.EthFilter;
@@ -45,9 +45,17 @@ import java.util.concurrent.TimeUnit;
 public class LastBountyHunterGame implements Runnable {
 
     private class finalBlockRecorder implements Runnable {
+
+        boolean flag = true;
+        Instant stopTime;
+
         @Override
         public void run() {
-            if (Instant.now().compareTo(currentRoundEndTime) <= 0) {
+            if (flag) {
+                flag = false;
+                stopTime = currentRoundEndTime.plus(15, ChronoUnit.SECONDS);
+            }
+            if (Instant.now().compareTo(stopTime) <= 0) {
                 try {
                     finalLatestBlockNumber = web3j.ethBlockNumber().send().getBlockNumber();
                 } catch (IOException e) {
@@ -99,14 +107,15 @@ public class LastBountyHunterGame implements Runnable {
 
     // Managing Variables
     Logger logger = Logger.getLogger(LastBountyHunterGame.class);
-    volatile boolean isGameRunning = false, shouldContinueGame = true, didSomeoneGotShot = false, hasGameClosed = false;
+    volatile boolean isGameRunning = false, shouldContinueGame = true, didSomeoneGotShot = false, hasGameClosed = false, closedByAdmin = false;
     volatile TransactionData lastCheckedTransactionData = null;
     volatile boolean shouldRecoverFromAbruptInterruption = false;
     volatile boolean abruptRecoveryComplete = true;
     private final Last_Bounty_Hunter_Bot last_bounty_hunter_bot;
     private final String chat_id;
     private volatile Instant currentRoundEndTime = null;
-    private volatile BigInteger finalLatestBlockNumber = null;
+    private volatile BigInteger finalLatestBlockNumber = null, prevBlock = null;
+    private volatile Instant prevTimeStamp = null;
     private final ScheduledExecutorService blockRecordingExecutorService = Executors.newSingleThreadScheduledExecutor();
     private final ScheduledExecutorService webSocketReconnectExecutorService = Executors.newSingleThreadScheduledExecutor();
     private int connectionCount = 0;
@@ -260,25 +269,6 @@ public class LastBountyHunterGame implements Runnable {
                             finalSender = transactionData.fromAddress;
                             finalBurnHash = transactionData.trxHash;
                             X = (transactionData.X + 1);
-                            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                                        💥🔫 First blood!!!
-                                        Hash :- %s, X = %s
-                                        Hunter %s has the bounty. Shoot him down before he claims it.
-                                        ⏱ Time limit: 30 minutes
-                                        💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), X, trimHashAndAddy(finalSender), getPrizePool()),
-                                    3, transactionData,"https://media.giphy.com/media/xaMURZrCVsFZzK6DnP/giphy.gif",
-                                    "https://media.giphy.com/media/UtXbAXl8Pt4Kr0f02Q/giphy.gif");
-                            if(shouldSendNotificationToMainRTKChat) {
-                                last_bounty_hunter_bot.enqueueMessageForSend(mainRuletkaChatID, String.format("""
-                                        💥🔫 First blood!!!
-                                        Hash :- %s, X = %s
-                                        Hunter %s has the bounty. Shoot him down before he claims it.
-                                        ⏱ Time limit: 30 minutes
-                                        💰 Bounty: %s
-                                        
-                                        Checkout @Last_Bounty_Hunter_RTK group now and grab that bounty""",  trimHashAndAddy(finalBurnHash), X,
-                                        trimHashAndAddy(finalSender), getPrizePool()),3, transactionData);
-                            }
                             didSomeoneGotShot = true;
                         } else {
                             addRTKToPot(transactionData.value, transactionData.fromAddress);
@@ -291,18 +281,20 @@ public class LastBountyHunterGame implements Runnable {
                                     "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
                         }
                     }
-                    if (didSomeoneGotShot) {
-                        checkForStatus(3);
-                    } else {
+                    if (!didSomeoneGotShot) {
                         continue;
                     }
 
                     isGameRunning = true;
+                    if (shouldRecoverFromAbruptInterruption) {
+                        shouldRecoverFromAbruptInterruption = lastCheckedTransactionData.compareTo(
+                                last_bounty_hunter_bot.lastSavedStateTransactionData) < 0;
+                    }
 
                     for (int roundCount = 1; roundCount <= 3; roundCount++) {
                         didSomeoneGotShot = false;
                         Instant currentRoundHalfTime, currentRoundQuarterTime;
-                        Instant currentRoundStartTime = Instant.now();
+                        Instant currentRoundStartTime = lastCheckedTransactionData.blockTimeStamp;
                         String msgString;
                         halfWarn = true;
                         quarterWarn = true;
@@ -313,15 +305,21 @@ public class LastBountyHunterGame implements Runnable {
                                 currentRoundQuarterTime = currentRoundEndTime.minus(8, ChronoUnit.MINUTES);
                                 halfWarn = Instant.now().compareTo(currentRoundHalfTime) < 0;
                                 quarterWarn = Instant.now().compareTo(currentRoundQuarterTime) < 0;
-                            } else {
+                            }
+                            else {
                                 currentRoundHalfTime = currentRoundStartTime.plus(15, ChronoUnit.MINUTES);
                                 currentRoundQuarterTime = currentRoundStartTime.plus(22, ChronoUnit.MINUTES);
                                 currentRoundEndTime = currentRoundStartTime.plus(30, ChronoUnit.MINUTES);
                             }
                             halfValue = 15;
                             quarterValue = 8;
-                            msgString = null;
-                            last_bounty_hunter_bot.lastSendStatus = 4;
+                            msgString = String.format("""
+                                💥🔫 First blood!!!
+                                Hash :- %s, X = %s
+                                Hunter %s has the bounty. Shoot him down before he claims it.
+                                ⏱ Time limit: 30 minutes (Ends at %s +0 UTC)
+                                💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), X, trimHashAndAddy(finalSender), simpleDateFormat.format(
+                                    Date.from(currentRoundEndTime)), getPrizePool());
                         } else if (roundCount == 2) {
                             if (shouldRecoverFromAbruptInterruption && lastGameEndTime != null && Instant.now().compareTo(lastGameEndTime) <= 0) {
                                 currentRoundEndTime = lastGameEndTime;
@@ -329,7 +327,8 @@ public class LastBountyHunterGame implements Runnable {
                                 currentRoundQuarterTime = currentRoundEndTime.minus(5, ChronoUnit.MINUTES);
                                 halfWarn = Instant.now().compareTo(currentRoundHalfTime) < 0;
                                 quarterWarn = Instant.now().compareTo(currentRoundQuarterTime) < 0;
-                            } else {
+                            }
+                            else {
                                 currentRoundHalfTime = currentRoundStartTime.plus(10, ChronoUnit.MINUTES);
                                 currentRoundQuarterTime = currentRoundStartTime.plus(15, ChronoUnit.MINUTES);
                                 currentRoundEndTime = currentRoundStartTime.plus(20, ChronoUnit.MINUTES);
@@ -340,8 +339,9 @@ public class LastBountyHunterGame implements Runnable {
                                 💥🔫 Gotcha! Round 2 started
                                 Hash :- %s, X = %s
                                 Hunter %s has the bounty now. Shoot him down before he claims it.
-                                ⏱ Time limit: 20 minutes
-                                💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), X, trimHashAndAddy(finalSender), getPrizePool());
+                                ⏱ Time limit: 20 minutes (Ends at %s +0 UTC)
+                                💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), X, trimHashAndAddy(finalSender), simpleDateFormat.format(
+                                    Date.from(currentRoundEndTime)), getPrizePool());
                         } else {
                             if (shouldRecoverFromAbruptInterruption && lastGameEndTime != null && Instant.now().compareTo(lastGameEndTime) <= 0) {
                                 currentRoundEndTime = lastGameEndTime;
@@ -349,7 +349,8 @@ public class LastBountyHunterGame implements Runnable {
                                 currentRoundQuarterTime = currentRoundEndTime.minus(3, ChronoUnit.MINUTES);
                                 halfWarn = Instant.now().compareTo(currentRoundHalfTime) < 0;
                                 quarterWarn = Instant.now().compareTo(currentRoundQuarterTime) < 0;
-                            } else {
+                            }
+                            else {
                                 currentRoundHalfTime = currentRoundStartTime.plus(5, ChronoUnit.MINUTES);
                                 currentRoundQuarterTime = currentRoundStartTime.plus(7, ChronoUnit.MINUTES);
                                 currentRoundEndTime = currentRoundStartTime.plus(10, ChronoUnit.MINUTES);
@@ -360,22 +361,23 @@ public class LastBountyHunterGame implements Runnable {
                                 💥🔫 Gotcha! Round 3 started
                                 Hash :- %s, X = %s
                                 Hunter %s has the bounty now. Shoot him down before he claims it.
-                                ⏱ Time limit: 10 minutes
-                                💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), X, trimHashAndAddy(finalSender), getPrizePool());
+                                ⏱ Time limit: 10 minutes (Ends at %s +0 UTC)
+                                💰 Bounty: %s""", trimHashAndAddy(finalBurnHash), X, trimHashAndAddy(finalSender), simpleDateFormat.format(
+                                    Date.from(currentRoundEndTime)), getPrizePool());
                         }
-                        boolean furtherCountNecessary = true;
                         if (msgString != null) {
-                            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, msgString, 4, null,
+                            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, msgString, 4, lastCheckedTransactionData,
                                     "https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
                                     "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
-                                    "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
+                                    "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif",
+                                    "https://media.giphy.com/media/xaMURZrCVsFZzK6DnP/giphy.gif",
+                                    "https://media.giphy.com/media/UtXbAXl8Pt4Kr0f02Q/giphy.gif");
                             if(shouldSendNotificationToMainRTKChat) {
                                 last_bounty_hunter_bot.enqueueMessageForSend(mainRuletkaChatID, msgString + """
                                                                                         
                                             Checkout @Last_Bounty_Hunter_RTK group now and grab that bounty""", 4, null);
                             }
                         }
-                        checkForStatus(4);
 
                         last_bounty_hunter_bot.logsPrintStream.println("RoundCount : " + roundCount + "\n" + zone + "\nStartTime : " +
                                 simpleDateFormat.format(Date.from(currentRoundStartTime)) + "\nHalfTime : " + simpleDateFormat.format(
@@ -383,27 +385,30 @@ public class LastBountyHunterGame implements Runnable {
                                 + "\nEndTime : " + simpleDateFormat.format(Date.from(currentRoundEndTime)) + "\nHalfWarn : " + halfWarn +
                                 "\nQuarterWarn : " + quarterWarn + "\nShouldRecoverFromAbruptInterruption : " + shouldRecoverFromAbruptInterruption);
 
+                        checkForStatus(4);
+                        boolean furtherCountNecessary = true;
+
                         MID:
                         while (Instant.now().compareTo(currentRoundEndTime) <= 0) {
                             if (halfWarn) {
                                 if (Instant.now().compareTo(currentRoundHalfTime) >= 0) {
                                     last_bounty_hunter_bot.logsPrintStream.println("Round " + roundCount + " Half Time");
-                                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Hurry up! Half Time crossed. LESS THAN " + halfValue + " minutes " +
-                                                    "remaining for the current round. Shoot hunter " + finalSender + " down before he claims the bounty!",
-                                            -2, null);
+                                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Hurry up! Half Time crossed. LESS THAN " + halfValue +
+                                                    " minutes remaining for the current round. Shoot hunter " + trimHashAndAddy(finalSender) +
+                                                    " down before he claims the bounty!", -2, null);
                                     halfWarn = false;
                                 }
                             } else if (quarterWarn) {
                                 if (Instant.now().compareTo(currentRoundQuarterTime) >= 0) {
                                     last_bounty_hunter_bot.logsPrintStream.println("Round " + roundCount + " 3-Quarter Time");
-                                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue + " minutes " +
-                                                    "remaining for the current round. Shoot hunter " + finalSender + " down before he claims the bounty!",
-                                            -2, null);
+                                    last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Hurry up! 3/4th Time crossed. LESS THAN " + quarterValue
+                                                    + " minutes remaining for the current round. Shoot hunter " + trimHashAndAddy(finalSender)
+                                                    + " down before he claims the bounty!", -2, null);
                                     if(shouldSendNotificationToMainRTKChat) {
                                         last_bounty_hunter_bot.enqueueMessageForSend(mainRuletkaChatID, "Hurry up! 3/4th Time crossed. LESS THAN "
-                                                        + quarterValue + " minutes remaining for the current round. Shoot hunter " +
-                                                        trimHashAndAddy(finalSender) + " down before he claims the bounty!\n\nCheckout " +
-                                                        "@Last_Bounty_Hunter_RTK group now and grab that bounty", -2, null);
+                                                + quarterValue + " minutes remaining for the current round. Shoot hunter " +
+                                                trimHashAndAddy(finalSender) + " down before he claims the bounty!\n\nCheckout " +
+                                                "@Last_Bounty_Hunter_RTK group now and grab that bounty", -2, null);
                                     }
                                     quarterWarn = false;
                                 }
@@ -417,7 +422,8 @@ public class LastBountyHunterGame implements Runnable {
                             while (transactionsUnderReview.size() > 0) {
                                 transactionData = transactionsUnderReview.remove(0);
                                 lastCheckedTransactionData = transactionData;
-                                if (finalLatestBlockNumber == null || transactionData.compareBlock(finalLatestBlockNumber) <= 0) {
+                                if ((finalLatestBlockNumber == null || transactionData.compareBlock(finalLatestBlockNumber) <= 0) && (
+                                        transactionData.blockTimeStamp == null || currentRoundEndTime.compareTo(transactionData.blockTimeStamp) >= 0)) {
                                     if (transactionData.didBurn) {
                                         finalSender = transactionData.fromAddress;
                                         finalBurnHash = transactionData.trxHash;
@@ -458,8 +464,6 @@ public class LastBountyHunterGame implements Runnable {
                             performProperWait(0.7);
                         }
 
-                        last_bounty_hunter_bot.logsPrintStream.println("End of Round " + roundCount);
-
                         if (!blockRecordingExecutorService.isShutdown() && roundCount == 3) {
                             blockRecordingExecutorService.shutdownNow();
                         }
@@ -468,7 +472,14 @@ public class LastBountyHunterGame implements Runnable {
                             String midMsg = (roundCount == 3) ? "All rounds have ended. " : "";
                             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, midMsg + "Checking for final desperate " +
                                     "attempts of hunters...(Don't try to hunt now. Results are already set in stone)", 5, null);
+
                             didSomeoneGotShot = false;
+                            try {
+                                Thread.sleep(5000);
+                            } catch (Exception e) {
+                                e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
+                            }
+
                             while (!validTransactions.isEmpty()) {
                                 transactionsUnderReview.add(validTransactions.remove(0));
                             }
@@ -478,21 +489,27 @@ public class LastBountyHunterGame implements Runnable {
                                 transactionData = transactionsUnderReview.remove(0);
                                 lastCheckedTransactionData = transactionData;
                                 if (finalLatestBlockNumber == null || transactionData.compareBlock(finalLatestBlockNumber) <= 0) {
-                                    if (transactionData.didBurn) {
-                                        finalSender = transactionData.fromAddress;
-                                        finalBurnHash = transactionData.trxHash;
-                                        X = (transactionData.X + 1);
-                                        didSomeoneGotShot = true;
-                                    } else {
-                                        addRTKToPot(transactionData.value, transactionData.fromAddress);
-                                        last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
+                                    if (transactionData.blockTimeStamp != null && currentRoundEndTime.compareTo(transactionData.blockTimeStamp) >= 0) {
+                                        if (transactionData.didBurn) {
+                                            finalSender = transactionData.fromAddress;
+                                            finalBurnHash = transactionData.trxHash;
+                                            X = (transactionData.X + 1);
+                                            didSomeoneGotShot = true;
+                                        } else {
+                                            addRTKToPot(transactionData.value, transactionData.fromAddress);
+                                            last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
                                                     Hash :- %s, X = %s
                                                     🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
                                                     💰 Updated bounty: %s""", trimHashAndAddy(transactionData.trxHash), (transactionData.X + 1),
-                                                trimHashAndAddy(transactionData.fromAddress), getPrizePool()), 5, transactionData,
-                                                "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
+                                                    trimHashAndAddy(transactionData.fromAddress), getPrizePool()), 5, transactionData,
+                                                    "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
+                                        }
+                                    } else {
+                                        transactionsUnderReview.add(0, transactionData);
+                                        break;
                                     }
-                                } else {
+                                }
+                                else {
                                     transactionsUnderReview.add(0, transactionData);
                                     break;
                                 }
@@ -503,9 +520,14 @@ public class LastBountyHunterGame implements Runnable {
                                         last_bounty_hunter_bot.lastSavedStateTransactionData) < 0;
                             }
                             if (!didSomeoneGotShot) {
+                                if (!blockRecordingExecutorService.isShutdown()) {
+                                    blockRecordingExecutorService.shutdownNow();
+                                }
                                 break;
                             }
                         }
+
+                        last_bounty_hunter_bot.logsPrintStream.println("End of Round " + roundCount);
                     }
 
 
@@ -621,7 +643,7 @@ public class LastBountyHunterGame implements Runnable {
 
     private void getCurrentGameDeleted(String deleterId) {
         allowConnector = false;
-        while (!last_bounty_hunter_bot.deleteGame(chat_id, this, deleterId)) {
+        while (!last_bounty_hunter_bot.deleteGame(chat_id, this, deleterId, closedByAdmin)) {
             performProperWait(1.5);
         }
         if (!blockRecordingExecutorService.isShutdown()) {
@@ -655,6 +677,7 @@ public class LastBountyHunterGame implements Runnable {
     }
 
     public void setShouldContinueGame(boolean shouldContinueGame) {
+        closedByAdmin = true;
         this.shouldContinueGame = shouldContinueGame;
     }
 
@@ -667,10 +690,11 @@ public class LastBountyHunterGame implements Runnable {
 
 
     // Related to Blockchain Communication
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    @SuppressWarnings({"SpellCheckingInspection", "BooleanMethodIsAlwaysInverted"})
     private boolean buildCustomBlockchainReader(boolean shouldSendMessage) {
 
         int count = 0;
+        prevBlock = null;
         if (shouldSendMessage) {
             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Connecting to Blockchain Network to read transactions. Please be patient. " +
                     "This can take from few seconds to few minutes", 1, null);
@@ -807,6 +831,8 @@ public class LastBountyHunterGame implements Runnable {
         last_bounty_hunter_bot.logsPrintStream.println("Building Filter\nLast Checked Block Number : " + lastCheckedTransactionData.blockNumber
                 + "\nStart Block For Filter : " + startBlock);
         RTKContractFilter = new EthFilter(new DefaultBlockParameterNumber(startBlock), DefaultBlockParameterName.LATEST, RTKContractAddresses);
+        RTKContractFilter.addOptionalTopics("0x897c6a07c341708f5a14324ccd833bbf13afacab63b30bbd827f7f1d29cfdff4",
+                "0xe7d849ade8c22f08229d6eec29ca84695b8f946b0970558272215552d79076e6");
         isBalanceEnough = hasEnoughBalance();
         try {
             disposable = web3j.ethLogFlowable(RTKContractFilter).subscribe(log -> {
@@ -815,6 +841,12 @@ public class LastBountyHunterGame implements Runnable {
                     Optional<Transaction> trx = web3j.ethGetTransactionByHash(hash).send().getTransaction();
                     if (trx.isPresent()) {
                         TransactionData currentTrxData = splitInputData(log, trx.get());
+
+                        if (currentTrxData.containsBuildError) {
+                            last_bounty_hunter_bot.logsPrintStream.println("Error Trx Data : " + currentTrxData);
+                            return;
+                        }
+
                         boolean f1, f2, f3, f4, f5;
 
                         if (currentTrxData.methodName != null) {
@@ -859,7 +891,8 @@ public class LastBountyHunterGame implements Runnable {
                             prevHash = hash;
                         } else {
                             last_bounty_hunter_bot.logsPrintStream.println("Ignored Incoming Hash : " + currentTrxData.trxHash + ", Reason : \n" +
-                                    f1 + ", " + f2 +  ", " + f3 + ", " + f4 + ", " + f5 + ", blockId : " + blockId);
+                                    "Useless : " + !f1 + ", Our Wallet : " + f2 +  ", Valid Amount : " + f3 + ", Is Successor : " + f4 +
+                                    ", Not old : " + f5 + ", blockId : " + blockId);
                         }
                     }
                 }
@@ -891,14 +924,24 @@ public class LastBountyHunterGame implements Runnable {
         String method = inputData.substring(0, 10);
         currentTransactionData.methodName = method;
         currentTransactionData.trxHash = transaction.getHash();
-        try {
-            currentTransactionData.blockNumber = transaction.getBlockNumber();
-        } catch (Exception e) {
-            currentTransactionData.methodName = "Useless";
-            return currentTransactionData;
-        }
         currentTransactionData.trxIndex = transaction.getTransactionIndex();
         currentTransactionData.X = RTKContractAddresses.indexOf(log.getAddress().toLowerCase());
+        try {
+            currentTransactionData.blockNumber = transaction.getBlockNumber();
+            if (!currentTransactionData.blockNumber.equals(prevBlock)) {
+                prevBlock = currentTransactionData.blockNumber;
+                currentTransactionData.blockTimeStamp = Instant.ofEpochSecond(web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(
+                        log.getBlockNumber()), false).send().getBlock().getTimestamp().longValue());
+                prevTimeStamp = currentTransactionData.blockTimeStamp;
+            } else {
+                currentTransactionData.blockTimeStamp = prevTimeStamp;
+            }
+        } catch (Exception e) {
+            currentTransactionData.methodName = "Useless";
+            currentTransactionData.blockTimeStamp = null;
+            currentTransactionData.containsBuildError = true;
+            return currentTransactionData;
+        }
 
         // If method is transfer method
         if (method.equalsIgnoreCase("0xa9059cbb")) {
@@ -906,8 +949,12 @@ public class LastBountyHunterGame implements Runnable {
             String topic = log.getTopics().get(0);
             if (topic.equalsIgnoreCase("0x897c6a07c341708f5a14324ccd833bbf13afacab63b30bbd827f7f1d29cfdff4")) {
                 currentTransactionData.didBurn = true;
-            } else if (topic.equalsIgnoreCase("0xe7d849ade8c22f08229d6eec29ca84695b8f946b0970558272215552d79076e6")) {
+            }
+            else if (topic.equalsIgnoreCase("0xe7d849ade8c22f08229d6eec29ca84695b8f946b0970558272215552d79076e6")) {
                 currentTransactionData.didBurn = false;
+            }
+            else {
+                currentTransactionData.containsBuildError = true;
             }
             Method refMethod = TypeDecoder.class.getDeclaredMethod("decode", String.class, int.class, Class.class);
             refMethod.setAccessible(true);
@@ -1023,6 +1070,7 @@ public class LastBountyHunterGame implements Runnable {
         return !last3CountedHash.contains(hash);
     }
 
+    @SuppressWarnings("SpellCheckingInspection")
     public void getAllPreviousTrx(String chatId, int X, String blockNumber) {
         try{
             last_bounty_hunter_bot.logsPrintStream.println("Request to Get Prev Trx CSV");
@@ -1053,17 +1101,17 @@ public class LastBountyHunterGame implements Runnable {
                                 Optional<Transaction> trx = web3j.ethGetTransactionByHash(hash).send().getTransaction();
                                 if (trx.isPresent()) {
                                     TransactionData currentTrxData = splitInputData(log, trx.get());
-                                    if (!currentTrxData.methodName.equals("Useless") && currentTrxData.didBurn) {
+                                    if (!currentTrxData.containsBuildError && !currentTrxData.methodName.equals("Useless") && currentTrxData.didBurn) {
                                         result.append(currentTrxData.trxHash).append(",").append(currentTrxData.fromAddress).append(",")
                                                 .append(currentTrxData.toAddress).append(",").append(currentTrxData.blockNumber).append(",")
                                                 .append(currentTrxData.value).append("\n");
+                                        prevHash = hash;
                                     }
                                 }
                             } catch (Exception e) {
                                 e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
                             }
                         }
-                        prevHash = hash;
                     }
                     try {
                         File file = new File("list.csv");
@@ -1087,6 +1135,8 @@ public class LastBountyHunterGame implements Runnable {
 
             EthFilter tempFilter = new EthFilter(new DefaultBlockParameterNumber(new BigInteger(blockNumber)),
                     new DefaultBlockParameterNumber(web3j.ethBlockNumber().send().getBlockNumber()), RTKContractAddresses.get(X-1));
+            tempFilter.addOptionalTopics("0x897c6a07c341708f5a14324ccd833bbf13afacab63b30bbd827f7f1d29cfdff4",
+                    "0xe7d849ade8c22f08229d6eec29ca84695b8f946b0970558272215552d79076e6");
 
             CSVMaker csvMaker = new CSVMaker(web3j.ethGetLogs(tempFilter).send().getLogs(), chatId);
             csvMaker.run();

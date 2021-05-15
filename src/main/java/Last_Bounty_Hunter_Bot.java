@@ -8,7 +8,6 @@ import com.mongodb.client.ClientSession;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
-import jnr.ffi.annotations.In;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.jetbrains.annotations.Nullable;
@@ -55,17 +54,29 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                         }
                     }
                 }
+                String msg = null;
                 if(makeChecks) {
-                    logsPrintStream.println("Msg Failed Check Before Dispatch. Text : " + ((currentMessage.isMessage) ?
-                            currentMessage.sendMessage.getText() : currentMessage.sendAnimation.getCaption()));
+                    msg = ((currentMessage.isMessage) ? currentMessage.sendMessage.getText() : currentMessage.sendAnimation.getCaption());
+                    logsPrintStream.println("Msg Failed Check Before Dispatch. Text :-\n" + (msg.substring(0, Math.min(msg.length(), 20))));
                     return;
                 }
                 if ((currentMessage.isMessage)) {
-                    logsPrintStream.println("Msg Sender (Executor): " + currentMessage.sendMessage.getText());
+                    if (currentMessage.sendMessage.getChatId().equals(actualGameChatId) ||
+                            currentMessage.sendMessage.getChatId().equals(testingChatId)) {
+                        msg = currentMessage.sendMessage.getText();
+                        msg = msg.substring(0, Math.min(msg.length(), 80));
+                    }
                     execute(currentMessage.sendMessage);
                 } else {
-                    logsPrintStream.println("Msg Sender (Executor): " + currentMessage.sendAnimation.getCaption());
+                    if (currentMessage.sendAnimation.getChatId().equals(actualGameChatId) ||
+                        currentMessage.sendAnimation.getChatId().equals(testingChatId)) {
+                        msg =  currentMessage.sendAnimation.getCaption();
+                        msg = msg.substring(0, Math.min(msg.length(), 80));
+                    }
                     execute(currentMessage.sendAnimation);
+                }
+                if (msg != null) {
+                    logsPrintStream.println("Msg Sender (Executor):\n" + msg);
                 }
                 if(currentMessage.hasTransactionData) {
                     lastSavedStateTransactionData = currentMessage.transactionData;
@@ -133,8 +144,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                     Document tempDoc = new Document();
                     for(String key : keys) {
                         LastBountyHunterGame lastBountyHunterGame = currentlyActiveGames.get(key);
-                        Document botNameDoc = new Document("botName", botName);
-                        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
 
                         tempDoc.append("trxHash", lastSavedStateTransactionData.trxHash)
                                 .append("from", lastSavedStateTransactionData.fromAddress)
@@ -152,16 +161,27 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                             else
                                 tempDoc.append("lastCountedHash" + i, "NULL");
                         }
-
-                        Bson updateAddyDocOperation = new Document("$set", tempDoc);
-                        assert foundBotNameDoc != null;
-                        botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
                         lastBountyHunterGame.tryToSaveState();
                     }
-                    logsPrintStream.println("\nSaved Game State :-\n" + tempDoc);
+
+                    Document botNameDoc = new Document("botName", botName);
+                    Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                    Bson updateAddyDocOperation = new Document("$set", tempDoc);
+                    assert foundBotNameDoc != null;
+                    botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
+
+                    // Retry for surity
+                    foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
+                    updateAddyDocOperation = new Document("$set", tempDoc);
+                    assert foundBotNameDoc != null;
+                    botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
+
+                    logsPrintStream.println("\nAttempted to save the Game State :-\n" + tempDoc);
+                    logsPrintStream.println("\nActual Saved Game State :-\n" + foundBotNameDoc);
                 } else {
                     logsPrintStream.println("Last Saved State Trx Data is NULL. Retaining old value.");
                 }
+                logsPrintStream.println("...Graceful Shutdown successful...");
                 logsPrintStream.flush();
                 logsPrintStream.close();
                 sendLogs(allAdmins.get(0).toString());
@@ -181,7 +201,6 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
 
             @Override
             public void println(@Nullable String x) {
-                super.println("-----------------------------");
                 super.println(x);
                 super.println("-----------------------------");
             }
@@ -286,7 +305,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
 
             if (shouldRunGame) {
                 undisposedGameCount++;
-                messageSendingExecutor.scheduleWithFixedDelay(new MessageSender(), 0, 1200, TimeUnit.MILLISECONDS);
+                messageSendingExecutor.scheduleWithFixedDelay(new MessageSender(), 0, 750, TimeUnit.MILLISECONDS);
                 switch (EthNetworkType) {
                     case "mainnet", "maticMainnet" -> {
                         LastBountyHunterGame newLastBountyHunterGame = new LastBountyHunterGame(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
@@ -299,8 +318,10 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                         gameRunningExecutorService.execute(newLastBountyHunterGame);
                     }
                 }
+                lastGameEndTime = Instant.now();
+            } else {
+                lastGameEndTime = Instant.now().minus(1, ChronoUnit.MINUTES);
             }
-            lastGameEndTime = Instant.now();
         } catch (Exception e) {
             e.printStackTrace(logsPrintStream);
         }
@@ -349,7 +370,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                             messageSendingExecutor.shutdownNow();
                         }
                         messageSendingExecutor = Executors.newSingleThreadScheduledExecutor();
-                        messageSendingExecutor.scheduleWithFixedDelay(new MessageSender(), 0, 1200, TimeUnit.MILLISECONDS);
+                        messageSendingExecutor.scheduleWithFixedDelay(new MessageSender(), 0, 750, TimeUnit.MILLISECONDS);
                         shouldRunGame = true;
                         Document botNameDoc = new Document("botName", botName);
                         Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
@@ -897,8 +918,8 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         }
     }
 
-    public boolean deleteGame(String chat_id, LastBountyHunterGame lastBountyHunterGame, String deleterId) {
-        logsPrintStream.println("\n...Request made to delete the Game...");
+    public boolean deleteGame(String chat_id, LastBountyHunterGame lastBountyHunterGame, String deleterId, boolean closedByAdmin) {
+        logsPrintStream.println("\n...Request made to delete the Game...\n(By Admin : " + closedByAdmin + ")");
         if (allPendingMessages.size() != 0) {
             if(!messageSendingExecutor.isShutdown()) {
                 logsPrintStream.println("Request to close the game with message sender shutdown and pending message > 0");
@@ -949,10 +970,10 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     }
 
     public void setTotalRTKForPoolInWallet(String amount) {
-        Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
-        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         Bson updateWalletDoc = new Document("totalRTKBalanceForPool", amount);
         Bson updateWalletDocOperation = new Document("$set", updateWalletDoc);
+        Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
+        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         assert foundWalletDetailDoc != null;
         walletDistributionCollection.updateOne(foundWalletDetailDoc, updateWalletDocOperation);
     }
@@ -990,10 +1011,10 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     }
 
     public void resetWasGameEndMessageSent() {
-        Document botNameDoc = new Document("botName", botName);
-        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
         Bson updatedAddyDoc = new Document("wasGameEndMessageSent", false);
         Bson updateAddyDocOperation = new Document("$set", updatedAddyDoc);
+        Document botNameDoc = new Document("botName", botName);
+        Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();
         assert foundBotNameDoc != null;
         botControlCollection.updateOne(foundBotNameDoc, updateAddyDocOperation);
     }
@@ -1039,7 +1060,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         } catch (Exception e) {
             lbh_lastGameState = new LBH_LastGameState(transactionData, null, arrayList);
         }
-        String msg = "\nPrevious State read :- \nTrxData -->";
+        String msg = "\nPrevious State read :- \nTrxData --> ";
         if(lbh_lastGameState.lastCheckedTransactionData != null) {
             msg += lbh_lastGameState.lastCheckedTransactionData.toString();
             msg += ", Last 3 Trx Hash : " + lbh_lastGameState.last3CountedHash;
@@ -1058,12 +1079,12 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     }
 
     public void setLastCheckedTransactionDetails(TransactionData transactionData) {
-        Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
-        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
-        assert foundWalletDetailDoc != null;
         Bson updateWalletDoc = new Document("lastCheckedBlockNumber", transactionData.blockNumber.toString())
                 .append("lastCheckedTransactionIndex", transactionData.trxIndex.toString());
         Bson updateWalletDocOperation = new Document("$set", updateWalletDoc);
+        Document walletDetailDoc = new Document("identifier", "walletBalanceDistribution");
+        Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
+        assert foundWalletDetailDoc != null;
         walletDistributionCollection.updateOne(foundWalletDetailDoc, updateWalletDocOperation);
     }
 }

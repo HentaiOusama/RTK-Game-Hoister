@@ -5,8 +5,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.hentai_productions</groupId>
-    <artifactId>last-bounty-hunter-bot</artifactId>
-    <version>8.1</version>
+    <artifactId>rtk-game-hoster</artifactId>
+    <version>9.0</version>
 
     <properties>
         <maven.compiler.source>15.0.1</maven.compiler.source>
@@ -69,7 +69,7 @@
             <plugin>
                 <groupId>com.heroku.sdk</groupId>
                 <artifactId>heroku-maven-plugin</artifactId>
-                <version>3.0.3</version>
+                <version>3.0.4</version>
                 <configuration>
                     <appName>last-bounty-hunter-bot</appName>
                     <includes>

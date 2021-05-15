@@ -1,4 +1,4 @@
-/*
+package Supporting_Classes;/*
  * Copyright 2020 Web3 Labs Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
@@ -11,25 +11,6 @@
  * specific language governing permissions and limitations under the License.
  */
 
-import java.io.IOException;
-import java.net.ConnectException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
-
-import Supporting_Classes.WebSocketRequest;
-import Supporting_Classes.WebSocketRequests;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,7 +21,6 @@ import io.reactivex.Flowable;
 import io.reactivex.subjects.BehaviorSubject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.web3j.protocol.ObjectMapperFactory;
 import org.web3j.protocol.Web3jService;
 import org.web3j.protocol.core.BatchRequest;
@@ -49,8 +29,22 @@ import org.web3j.protocol.core.Request;
 import org.web3j.protocol.core.Response;
 import org.web3j.protocol.core.methods.response.EthSubscribe;
 import org.web3j.protocol.core.methods.response.EthUnsubscribe;
+import org.web3j.protocol.websocket.WebSocketClient;
+import org.web3j.protocol.websocket.WebSocketListener;
+import org.web3j.protocol.websocket.WebSocketSubscription;
 import org.web3j.protocol.websocket.events.Notification;
-import org.web3j.protocol.websocket.*;
+
+import java.io.IOException;
+import java.net.ConnectException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 /**
  * Web socket service that allows to interact with JSON-RPC via WebSocket protocol.
@@ -63,12 +57,12 @@ import org.web3j.protocol.websocket.*;
  * <p>To unsubscribe from a stream of notifications it should send another JSON-RPC request.
  */
 public class WebSocketService implements Web3jService {
-    private static final Logger log = LoggerFactory.getLogger(Supporting_Classes.WebSocketService.class);
+    private static final Logger log = LoggerFactory.getLogger(WebSocketService.class);
 
     // Timeout for JSON-RPC requests
-    static final long REQUEST_TIMEOUT = 60;
+    public static final long REQUEST_TIMEOUT = 60;
     // replaced batch's next id
-    static final AtomicLong nextBatchId = new AtomicLong(0);
+    public static final AtomicLong nextBatchId = new AtomicLong(0);
 
     // WebSocket client
     private final WebSocketClient webSocketClient;
@@ -95,7 +89,7 @@ public class WebSocketService implements Web3jService {
         this(webSocketClient, Executors.newScheduledThreadPool(1), includeRawResponses);
     }
 
-    WebSocketService(
+    public WebSocketService(
             WebSocketClient webSocketClient,
             ScheduledExecutorService executor,
             boolean includeRawResponses) {
@@ -257,13 +251,13 @@ public class WebSocketService implements Web3jService {
                 TimeUnit.SECONDS);
     }
 
-    void closeRequest(long requestId, Exception e) {
+    public void closeRequest(long requestId, Exception e) {
         CompletableFuture result = requestForId.get(requestId).getOnReply();
         requestForId.remove(requestId);
         result.completeExceptionally(e);
     }
 
-    void onWebSocketMessage(String messageStr) throws IOException {
+    public void onWebSocketMessage(String messageStr) throws IOException {
         JsonNode replyJson = parseToTree(messageStr);
 
         if (isReply(replyJson)) {
@@ -533,7 +527,7 @@ public class WebSocketService implements Web3jService {
         executor.shutdown();
     }
 
-    void onWebSocketClose() {
+    public void onWebSocketClose() {
         closeOutstandingRequests();
         closeOutstandingSubscriptions();
     }

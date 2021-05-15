@@ -6,10 +6,9 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="Deadline Chaser Bot" />
-        <module name="Last Bounty Hunter Bot" />
-        <module name="last-bounty-hunter-bot" />
+        <module name="RTK Game Hoster" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel target="15.0.1" />
   </component>
 </project>
