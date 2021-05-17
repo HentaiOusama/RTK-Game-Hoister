@@ -971,7 +971,7 @@ public class LastBountyHunterGame implements Runnable {
 
 
     private String trimHashAndAddy(String string) {
-        if(string != null) {
+        if(string != null && string.length() >= 12) {
             int len = string.length();
             return string.substring(0, 6) + "...." + string.substring(len - 6, len);
         } else {

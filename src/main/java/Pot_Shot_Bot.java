@@ -36,17 +36,27 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
         public void run() {
             try {
                 TelegramMessage currentMessage = allPendingMessages.take();
+                String msg = null;
                 if ((currentMessage.isMessage)) {
-                    logsPrintStream.println("Msg Sender (Executor): " + currentMessage.sendMessage.getText());
+                    if (currentMessage.sendMessage.getChatId().equals(actualGameChatId) ||
+                            currentMessage.sendMessage.getChatId().equals(testingChatId)) {
+                        msg = currentMessage.sendMessage.getText();
+                        msg = msg.substring(0, Math.min(msg.length(), 80));
+                    }
                     execute(currentMessage.sendMessage);
                 } else {
-                    logsPrintStream.println("Msg Sender (Executor): " + currentMessage.sendAnimation.getCaption());
+                    if (currentMessage.sendAnimation.getChatId().equals(actualGameChatId) ||
+                            currentMessage.sendAnimation.getChatId().equals(testingChatId)) {
+                        msg =  currentMessage.sendAnimation.getCaption();
+                        msg = msg.substring(0, Math.min(msg.length(), 80));
+                    }
                     execute(currentMessage.sendAnimation);
+                }
+                if (msg != null) {
+                    logsPrintStream.println("Msg Sender (Executor):\n" + msg);
                 }
                 if(currentMessage.hasTransactionData) {
                     lastSavedStateTransactionData = currentMessage.transactionData;
-                } else {
-                    logsPrintStream.println("(Message Sender) No Trx Data with the current Msg");
                 }
             } catch (Exception e) {
                 e.printStackTrace(logsPrintStream);
@@ -68,6 +78,7 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
     boolean shouldUseProxy, shouldUseQuickNode;
     private final ArrayList<ProxyIP> allProxies = new ArrayList<>();
     private Instant lastGameEndTime = Instant.now();
+    volatile Instant lastMomentWhenTrxWasRead = Instant.now(), lastMomentFromCommandUse = Instant.now().minus(55, ChronoUnit.MINUTES);
 
     // Blockchain Related Stuff
     private String EthNetworkType;
@@ -113,6 +124,7 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
                 } else {
                     logsPrintStream.println("Last Saved State Trx Data is NULL. Retaining old value.");
                 }
+                logsPrintStream.println("...Graceful Shutdown Successful...");
                 logsPrintStream.flush();
                 logsPrintStream.close();
                 sendLogs(allAdmins.get(0).toString());
@@ -132,7 +144,6 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
 
             @Override
             public void println(@Nullable String x) {
-                super.println("-----------------------------");
                 super.println(x);
                 super.println("-----------------------------");
             }
@@ -237,7 +248,7 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
 
             if (shouldRunGame) {
                 undisposedGameCount++;
-                messageSendingExecutor.scheduleWithFixedDelay(new Pot_Shot_Bot.MessageSender(), 0, 1200, TimeUnit.MILLISECONDS);
+                messageSendingExecutor.scheduleWithFixedDelay(new Pot_Shot_Bot.MessageSender(), 0, 750, TimeUnit.MILLISECONDS);
                 switch (EthNetworkType) {
                     case "mainnet", "maticMainnet" -> {
                         PotShotBotGame newPotShotBotGame = new PotShotBotGame(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
@@ -250,8 +261,10 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
                         gameRunningExecutorService.execute(newPotShotBotGame);
                     }
                 }
+                lastGameEndTime = Instant.now();
+            } else {
+                lastGameEndTime = Instant.now().minus(1, ChronoUnit.MINUTES);
             }
-            lastGameEndTime = Instant.now();
         } catch (Exception e) {
             e.printStackTrace(logsPrintStream);
         }
@@ -299,7 +312,7 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
                             messageSendingExecutor.shutdownNow();
                         }
                         messageSendingExecutor = Executors.newSingleThreadScheduledExecutor();
-                        messageSendingExecutor.scheduleWithFixedDelay(new Pot_Shot_Bot.MessageSender(), 0, 1200, TimeUnit.MILLISECONDS);
+                        messageSendingExecutor.scheduleWithFixedDelay(new Pot_Shot_Bot.MessageSender(), 0, 750, TimeUnit.MILLISECONDS);
                         shouldRunGame = true;
                         Document botNameDoc = new Document("botName", botName);
                         Document foundBotNameDoc = (Document) botControlCollection.find(botNameDoc).first();

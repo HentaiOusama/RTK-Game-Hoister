@@ -15,6 +15,7 @@ import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.contracts.eip20.generated.ERC20;
 import org.web3j.crypto.Credentials;
 import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.DefaultBlockParameterNumber;
 import org.web3j.protocol.core.methods.request.EthFilter;
@@ -30,6 +31,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.net.*;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -212,7 +214,7 @@ public class PotShotBotGame implements Runnable {
     
 
     // Fixed
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    @SuppressWarnings({"SpellCheckingInspection", "BooleanMethodIsAlwaysInverted"})
     private boolean buildCustomBlockchainReader(boolean shouldSendMessage) {
 
         int count = 0;
@@ -350,8 +352,11 @@ public class PotShotBotGame implements Runnable {
         if(EthNetworkType.startsWith("maticMainnet") && !pot_shot_bot.shouldUseQuickNode && latestBlockNumber != null) {
             startBlock = (startBlock.compareTo(latestBlockNumber.subtract(BigInteger.valueOf(850))) >= 0) ? startBlock : latestBlockNumber;
         }
-        pot_shot_bot.logsPrintStream.println("Building Filter\nLast Checked Block Number : " + lastCheckedTransactionData.blockNumber);
+        pot_shot_bot.logsPrintStream.println("Building Filter\nLast Checked Block Number : " + lastCheckedTransactionData.blockNumber
+                + "\nStart Block For Filter : " + startBlock);
         RTKContractFilter = new EthFilter(new DefaultBlockParameterNumber(startBlock), DefaultBlockParameterName.LATEST, RTKContractAddresses);
+        RTKContractFilter.addOptionalTopics("0x897c6a07c341708f5a14324ccd833bbf13afacab63b30bbd827f7f1d29cfdff4",
+                "0xe7d849ade8c22f08229d6eec29ca84695b8f946b0970558272215552d79076e6");
         isBalanceEnough = hasEnoughBalance();
         try {
             disposable = web3j.ethLogFlowable(RTKContractFilter).subscribe(log -> {
@@ -360,6 +365,12 @@ public class PotShotBotGame implements Runnable {
                     Optional<Transaction> trx = web3j.ethGetTransactionByHash(hash).send().getTransaction();
                     if (trx.isPresent()) {
                         TransactionData currentTrxData = splitInputData(log, trx.get());
+
+                        if (currentTrxData.containsBuildError) {
+                            pot_shot_bot.logsPrintStream.println("Error Trx Data : " + currentTrxData);
+                            return;
+                        }
+
                         boolean f1, f2, f3, f4, f5;
 
                         if (currentTrxData.methodName != null) {
@@ -391,10 +402,12 @@ public class PotShotBotGame implements Runnable {
                             prevHash = hash;
                         } else {
                             pot_shot_bot.logsPrintStream.println("Ignored Incoming Hash : " + currentTrxData.trxHash + ", Reason : \n" +
-                                    f1 + ", " + f2 +  ", " + f3 + ", " + f4 + ", " + f5);
+                                    "Useless : " + !f1 + ", Our Wallet : " + f2 +  ", Valid Amount : " + f3 + ", Is Successor : " + f4 +
+                                    ", Not old : " + f5);
                         }
                     }
                 }
+                pot_shot_bot.lastMomentWhenTrxWasRead = Instant.now();
             }, throwable -> {
                 pot_shot_bot.logsPrintStream.println("Disposable Internal Error (Throwable)");
                 throwable.printStackTrace(pot_shot_bot.logsPrintStream);
@@ -438,6 +451,8 @@ public class PotShotBotGame implements Runnable {
                 currentTransactionData.didBurn = true;
             } else if (topic.equalsIgnoreCase("0xe7d849ade8c22f08229d6eec29ca84695b8f946b0970558272215552d79076e6")) {
                 currentTransactionData.didBurn = false;
+            } else {
+                currentTransactionData.containsBuildError = true;
             }
             Method refMethod = TypeDecoder.class.getDeclaredMethod("decode", String.class, int.class, Class.class);
             refMethod.setAccessible(true);
@@ -499,7 +514,7 @@ public class PotShotBotGame implements Runnable {
     }
     
     private String trimHashAndAddy(String string) {
-        if(string != null) {
+        if(string != null && string.length() >= 12) {
             int len = string.length();
             return string.substring(0, 6) + "...." + string.substring(len - 6, len);
         } else {
