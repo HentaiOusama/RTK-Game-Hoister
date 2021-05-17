@@ -22,6 +22,7 @@ import org.web3j.protocol.core.DefaultBlockParameterNumber;
 import org.web3j.protocol.core.methods.request.EthFilter;
 import org.web3j.protocol.core.methods.response.*;
 import org.web3j.protocol.websocket.WebSocketClient;
+import org.web3j.tx.RawTransactionManager;
 import org.web3j.tx.gas.ContractGasProvider;
 
 import java.io.File;
@@ -1156,54 +1157,45 @@ public class LastBountyHunterGame implements Runnable {
         assert balance != null;
         assert balance.compareTo(amount) >= 0;
 
-        Function function = new Function("approve",
-                Arrays.asList(new Address(last_bounty_hunter_bot.swapContractAddress), new Uint256(amount)),
-                Collections.singletonList(new TypeReference<Bool>() {
-                }));
-        String approveFunction = FunctionEncoder.encode(function);
-        EthCall response = null;
-
         try {
-            response = web3j.ethCall(
-                    org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(shotWallet, RTKContractAddresses.get(X-1),
-                            approveFunction), DefaultBlockParameterName.LATEST).send();
-        } catch (Exception e) {
-            last_bounty_hunter_bot.logsPrintStream.println("Error during approve");
-            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
-        }
-        assert response != null;
-        List<Type> operationResult = FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
-        boolean result = Boolean.parseBoolean(operationResult.get(0).getValue().toString());
+            BigInteger gasPrice = web3j.ethGasPrice().send().getGasPrice();
+            String hash;
 
-        if (result) {
-            function = new Function("convertRTKLXIntoRTK",
-                    Arrays.asList(new Address(shotWallet), new Uint256(amount), new Uint256(X)),
+            ERC20.load(RTKContractAddresses.get(X - 1), web3j, Credentials.create(System.getenv("LBHPrivateKey")),
+                    new ContractGasProvider() {
+                        @Override
+                        public BigInteger getGasPrice(String s) {
+                            return gasPrice;
+                        }
+
+                        @Override
+                        public BigInteger getGasPrice() {
+                            return gasPrice;
+                        }
+
+                        @Override
+                        public BigInteger getGasLimit(String s) {
+                            return BigInteger.valueOf(100000L);
+                        }
+
+                        @Override
+                        public BigInteger getGasLimit() {
+                            return BigInteger.valueOf(100000L);
+                        }
+                    }).approve(last_bounty_hunter_bot.swapContractAddress, new BigInteger(_amount)).send();
+
+            Function function = new Function("convertRTKLXIntoRTK", Arrays.asList(new Address(shotWallet), new Uint256(amount), new Uint256(X)),
                     Collections.singletonList(new TypeReference<Bool>() {
-                    }));
-            String convertFunction = FunctionEncoder.encode(function);
-            response = null;
+            }));
 
-            try {
-                response = web3j.ethCall(org.web3j.protocol.core.methods.request.Transaction.createEthCallTransaction(shotWallet,
-                        last_bounty_hunter_bot.swapContractAddress, convertFunction), DefaultBlockParameterName.LATEST).send();
-            } catch (Exception e) {
-                last_bounty_hunter_bot.logsPrintStream.println("Error during conversion");
-                e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
-            }
-            assert response != null;
-            operationResult = FunctionReturnDecoder.decode(
-                    response.getValue(), function.getOutputParameters());
-            result = Boolean.parseBoolean(operationResult.get(0).getValue().toString());
-            if(result) {
-                last_bounty_hunter_bot.sendMessage(chat_id, "Operation Successful");
-                return;
-            } else {
-                last_bounty_hunter_bot.logsPrintStream.println("Result of Convert Function Was False..");
-            }
-        } else {
-            last_bounty_hunter_bot.logsPrintStream.println("Result of Approve was False...");
+            RawTransactionManager rawTransactionManager = new RawTransactionManager(web3j, Credentials.create(System.getenv("LBHPrivateKey")));
+            hash = rawTransactionManager.sendTransaction(gasPrice, new BigInteger("950000"), last_bounty_hunter_bot.swapContractAddress,
+                    FunctionEncoder.encode(function), BigInteger.ZERO).getTransactionHash();
+
+            last_bounty_hunter_bot.sendMessage(chat_id, "Operation Successful. Hash : " + hash);
+        } catch (Exception e) {
+            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
+            last_bounty_hunter_bot.sendFile(chat_id, "Operation Unsuccessful. Refer Logs...");
         }
-
-        last_bounty_hunter_bot.sendMessage(chat_id, "Operation Unsuccessful. Check Logs");
     }
 }

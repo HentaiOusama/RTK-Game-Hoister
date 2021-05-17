@@ -110,7 +110,7 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
     private final String shotWallet;
     private String[] RTKContractAddresses;
     private BigInteger shotCost;
-    String swapContractAddress;
+    final String swapContractAddress = "0x3CCB85af88DE1A148CC942eA9065c2E8b470cf11";
     String maticPrefix;
     String etherPrefix;
     ArrayList<String> maticWebSocketUrls = new ArrayList<>();
@@ -432,13 +432,17 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
                         try {
                             BigInteger amount = new BigInteger(text.split(" ")[1]);
                             BigInteger diffBalance = amount.subtract(new BigInteger(getTotalRTKForPoolInWallet()));
+                            if (keys.size() == 0) {
+                                setTotalRTKForPoolInWallet(amount.toString());
+                                return;
+                            }
                             boolean shouldUpdate;
                             for (String key : keys) {
                                 LastBountyHunterGame lastBountyHunterGame = currentlyActiveGames.get(key);
                                 shouldUpdate = lastBountyHunterGame.addRTKToPot(diffBalance, "Override");
                                 if(shouldUpdate) {
-                                    lastBountyHunterGame.sendBountyUpdateMessage(diffBalance);
                                     setTotalRTKForPoolInWallet(amount.toString());
+                                    lastBountyHunterGame.sendBountyUpdateMessage(diffBalance);
                                 } else {
                                     sendMessage(chatId, "LastBountyHunterGame Wallet RTK Balance not enough to support this operation.");
                                 }
