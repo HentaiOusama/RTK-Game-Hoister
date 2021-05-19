@@ -183,6 +183,7 @@ public class LastBountyHunterGame implements Runnable {
                 last3CountedHash = LBHLastGameState.last3CountedHash;
                 lastGameEndTime = LBHLastGameState.lastGameEndTime;
             } else {
+                pushTransaction(lastCheckedTransactionData.trxHash);
                 last_bounty_hunter_bot.makeChecks = false;
             }
             if (EthNetworkType.equalsIgnoreCase("ropsten")) {
@@ -590,8 +591,13 @@ public class LastBountyHunterGame implements Runnable {
             e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
         }
 
-        last_bounty_hunter_bot.setTotalRTKForPoolInWallet(netCurrentPool.toString());
-        last_bounty_hunter_bot.setLastCheckedTransactionDetails(lastCheckedTransactionData);
+        tryToSaveState();
+        try {
+            Thread.sleep(2000);
+        } catch (Exception e) {
+            e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
+        }
+        tryToSaveState();
 
         getCurrentGameDeleted("Deleter-Run-END");
     }
@@ -676,6 +682,8 @@ public class LastBountyHunterGame implements Runnable {
         } catch (Exception e) {
             e.printStackTrace(last_bounty_hunter_bot.logsPrintStream);
         }
+        tryToSaveState();
+        last_bounty_hunter_bot.logsPrintStream.println("Data Written to wallet Distribution : \n" + lastCheckedTransactionData);
         last_bounty_hunter_bot.decreaseUndisposedGameCount();
         last_bounty_hunter_bot.logsPrintStream.println("Game Closed...");
     }

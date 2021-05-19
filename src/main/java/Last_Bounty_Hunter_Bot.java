@@ -980,6 +980,12 @@ public class Last_Bounty_Hunter_Bot extends TelegramLongPollingBot {
         Document foundWalletDetailDoc = (Document) walletDistributionCollection.find(walletDetailDoc).first();
         assert foundWalletDetailDoc != null;
         walletDistributionCollection.updateOne(foundWalletDetailDoc, updateWalletDocOperation);
+        try {
+            Thread.sleep(500);
+        } catch (Exception e) {
+            e.printStackTrace(logsPrintStream);
+        }
+        walletDistributionCollection.updateOne(foundWalletDetailDoc, updateWalletDocOperation);
     }
 
     public String getTotalRTKForPoolInWallet() {
