@@ -15,7 +15,6 @@ import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.contracts.eip20.generated.ERC20;
 import org.web3j.crypto.Credentials;
 import org.web3j.protocol.Web3j;
-import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.DefaultBlockParameterNumber;
 import org.web3j.protocol.core.methods.request.EthFilter;
@@ -261,8 +260,12 @@ public class PotShotBotGame implements Runnable {
                     webSocketUrls = pot_shot_bot.quickNodeWebSocketUrls;
                     prefix = "";
                     infix = "";
+                } else if(infix.equals("mainnet") && pot_shot_bot.shouldUseFigment) {
+                    webSocketUrls = pot_shot_bot.figmentWebSocketUrls;
+                    prefix = "";
+                    infix = "";
                 } else {
-                    webSocketUrls = pot_shot_bot.maticWebSocketUrls;
+                    webSocketUrls = pot_shot_bot.maticVigilWebSocketUrls;
                     prefix = pot_shot_bot.maticPrefix;
                 }
             } else {

@@ -749,8 +749,14 @@ public class LastBountyHunterGame implements Runnable {
                     webSocketUrls = last_bounty_hunter_bot.quickNodeWebSocketUrls;
                     prefix = "";
                     infix = "";
-                } else {
-                    webSocketUrls = last_bounty_hunter_bot.maticWebSocketUrls;
+                }
+                else if (infix.equals("mainnet") && last_bounty_hunter_bot.shouldUseFigment) {
+                    webSocketUrls = last_bounty_hunter_bot.figmentWebSocketUrls;
+                    prefix = "";
+                    infix = "";
+                }
+                else {
+                    webSocketUrls = last_bounty_hunter_bot.maticVigilWebSocketUrls;
                     prefix = last_bounty_hunter_bot.maticPrefix;
                 }
             } else {
