@@ -22,6 +22,7 @@ import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.core.methods.response.Transaction;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.websocket.WebSocketClient;
+import org.web3j.tx.RawTransactionManager;
 import org.web3j.tx.gas.ContractGasProvider;
 
 import java.io.IOException;
@@ -479,8 +480,9 @@ public class PotShotBotGame implements Runnable {
 
     private void sendRewardToWinner(BigInteger amount, String toAddress) {
         try {
-            TransactionReceipt trxReceipt = ERC20.load(RTKContractAddresses.get(0), web3j, Credentials.create(
-                    System.getenv("PSB" + pot_shot_bot.botType.charAt(0) + "PrivateKey")),
+            RawTransactionManager rawTransactionManager = new RawTransactionManager(web3j, Credentials.create(
+                    System.getenv("PSB" + pot_shot_bot.botType.charAt(0) + "PrivateKey")), web3j.ethChainId().send().getChainId().longValue());
+            TransactionReceipt trxReceipt = ERC20.load(RTKContractAddresses.get(0), web3j, rawTransactionManager,
                     new ContractGasProvider() {
                         @Override
                         public BigInteger getGasPrice(String s) {

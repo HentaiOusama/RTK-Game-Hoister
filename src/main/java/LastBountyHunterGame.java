@@ -1019,7 +1019,9 @@ public class LastBountyHunterGame implements Runnable {
 
     private void sendRewardToWinner(BigInteger amount, String toAddress) {
         try {
-            TransactionReceipt trxReceipt = ERC20.load(RTKContractAddresses.get(0), web3j, Credentials.create(System.getenv("LBHPrivateKey")),
+            RawTransactionManager rawTransactionManager = new RawTransactionManager(web3j, Credentials.create(System.getenv("LBHPrivateKey")),
+                    web3j.ethChainId().send().getChainId().longValue());
+            TransactionReceipt trxReceipt = ERC20.load(RTKContractAddresses.get(0), web3j, rawTransactionManager,
                     new ContractGasProvider() {
                         @Override
                         public BigInteger getGasPrice(String s) {
@@ -1205,7 +1207,8 @@ public class LastBountyHunterGame implements Runnable {
                     Collections.singletonList(new TypeReference<Bool>() {
             }));
 
-            RawTransactionManager rawTransactionManager = new RawTransactionManager(web3j, Credentials.create(System.getenv("LBHPrivateKey")));
+            RawTransactionManager rawTransactionManager = new RawTransactionManager(web3j, Credentials.create(System.getenv("LBHPrivateKey")),
+                    web3j.ethChainId().send().getChainId().longValue());
             hash = rawTransactionManager.sendTransaction(gasPrice, new BigInteger("950000"), last_bounty_hunter_bot.swapContractAddress,
                     FunctionEncoder.encode(function), BigInteger.ZERO).getTransactionHash();
 

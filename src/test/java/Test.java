@@ -1,11 +1,16 @@
 import Supporting_Classes.WebSocketService;
 import io.reactivex.Flowable;
 import io.reactivex.disposables.Disposable;
+import org.web3j.contracts.eip20.generated.ERC20;
+import org.web3j.crypto.Credentials;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterNumber;
 import org.web3j.protocol.core.methods.request.EthFilter;
 import org.web3j.protocol.core.methods.response.Log;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.websocket.WebSocketClient;
+import org.web3j.tx.RawTransactionManager;
+import org.web3j.tx.gas.ContractGasProvider;
 
 import java.math.BigInteger;
 import java.net.URI;
@@ -29,6 +34,37 @@ public class Test {
                     new URI(System.getenv("tempUri"))), true);
             webSocketService.connect();
             web3j = Web3j.build(webSocketService);
+
+            if (false) {
+                RawTransactionManager rawTransactionManager = new RawTransactionManager(web3j, Credentials.create(
+                        System.getenv("PrivateKey")), web3j.ethChainId().send().getChainId().longValue());
+                BigInteger gasPrice = web3j.ethGasPrice().send().getGasPrice();
+                System.out.println("GasPrice : " + gasPrice);
+                TransactionReceipt trxReceipt = ERC20.load(RTKContractAddresses.get(0), web3j, rawTransactionManager,
+                        new ContractGasProvider() {
+                            @Override
+                            public BigInteger getGasPrice(String s) {
+                                return gasPrice;
+                            }
+
+                            @Override
+                            public BigInteger getGasPrice() {
+                                return gasPrice;
+                            }
+
+                            @Override
+                            public BigInteger getGasLimit(String s) {
+                                return BigInteger.valueOf(65000L);
+                            }
+
+                            @Override
+                            public BigInteger getGasLimit() {
+                                return BigInteger.valueOf(65000L);
+                            }
+                        }).transfer("0xf7C1f4cA54D64542061E6f53A9D38E2f5A6A4Ecc",
+                        new BigInteger("1000000000000000")).sendAsync().get();
+                System.out.println("TrxHash : " + trxReceipt.getTransactionHash());
+            }
 
             BigInteger latestBlock = web3j.ethBlockNumber().send().getBlockNumber();
             EthFilter ethFilter = new EthFilter(new DefaultBlockParameterNumber(new BigInteger("14443714")), new DefaultBlockParameterNumber(latestBlock),
