@@ -138,6 +138,8 @@ public class PotShotBotGame implements Runnable {
             return;
         }
 
+        pot_shot_bot.enqueueMessageForSend(chat_id, "Connection Successful", null);
+
         if (!isBalanceEnough) {
             pot_shot_bot.enqueueMessageForSend(chat_id, String.format("""
                             Rewards Wallet %s doesn't have enough eth for transactions. Please contact admins. Closing LastBountyHunterGame...

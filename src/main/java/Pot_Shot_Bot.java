@@ -204,9 +204,9 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
             try {
                 String[] linkCounts = ((String) foundBotIndependentDoc.get("urlCounts")).trim().split(" ");
                 int maticVigilCount = Integer.parseInt(linkCounts[0]);
-                int QuickNodeCount = Integer.parseInt(linkCounts[1]);
-                int etherCount = Integer.parseInt(linkCounts[2]);
-                int figmentCount = Integer.parseInt(linkCounts[3]);
+                int QuickNodeCount = Integer.parseInt(linkCounts[1]) + maticVigilCount;
+                int etherCount = Integer.parseInt(linkCounts[2]) + QuickNodeCount;
+                int figmentCount = Integer.parseInt(linkCounts[3]) + etherCount;
                 if (foundBotIndependentDoc.get("urlList") instanceof List) {
                     for (int i = 0; i < (((List<?>) foundBotIndependentDoc.get("urlList")).size()); i++) {
                         Object item = ((List<?>) foundBotIndependentDoc.get("urlList")).get(i);
@@ -217,7 +217,7 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
                                 etherPrefix = (String) item;
                             } else if(i < maticVigilCount + 2) {
                                 maticVigilWebSocketUrls.add((String) item);
-                            } else if(i < maticVigilCount + QuickNodeCount + 2) {
+                            } else if(i < QuickNodeCount + 2) {
                                 quickNodeWebSocketUrls.add((String) item);
                             } else if (i < etherCount + 2) {
                                 etherWebSocketUrls.add((String) item);
@@ -227,6 +227,8 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
                         }
                     }
                 }
+                logsPrintStream.println("Read Urls : \n" + maticVigilWebSocketUrls + "\n" + quickNodeWebSocketUrls +
+                        "\n" + etherWebSocketUrls + "\n" + figmentWebSocketUrls);
             } catch (Exception e) {
                 e.printStackTrace(logsPrintStream);
             }
@@ -452,28 +454,44 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
                     Document botIndependentDoc = new Document("botName", "Bot Independent Data");
                     Document foundBotIndependentDoc = (Document) botControlCollection.find(botIndependentDoc).first();
                     assert foundBotIndependentDoc != null;
-                    String[] linkCounts = ((String) foundBotIndependentDoc.get("urlCounts")).trim().split(" ");
-                    int maticCount = Integer.parseInt(linkCounts[0]);
-                    int QuickNodeCount = Integer.parseInt(linkCounts[1]);
-                    if (foundBotIndependentDoc.get("urlList") instanceof List) {
-                        for (int i = 0; i < (((List<?>) foundBotIndependentDoc.get("urlList")).size()); i++) {
-                            Object item = ((List<?>) foundBotIndependentDoc.get("urlList")).get(i);
-                            if (item instanceof String) {
-                                if(i == 0) {
-                                    maticPrefix = (String) item;
-                                } else if(i == 1) {
-                                    etherPrefix = (String) item;
-                                } else if(i < maticCount + 2) {
-                                    maticVigilWebSocketUrls.add((String) item);
-                                } else if(i < maticCount + QuickNodeCount + 2) {
-                                    quickNodeWebSocketUrls.add((String) item);
-                                } else {
-                                    etherWebSocketUrls.add((String) item);
+                    maticVigilWebSocketUrls = new ArrayList<>();
+                    quickNodeWebSocketUrls = new ArrayList<>();
+                    figmentWebSocketUrls = new ArrayList<>();
+                    etherWebSocketUrls = new ArrayList<>();
+
+                    try {
+                        String[] linkCounts = ((String) foundBotIndependentDoc.get("urlCounts")).trim().split(" ");
+                        int maticVigilCount = Integer.parseInt(linkCounts[0]);
+                        int QuickNodeCount = Integer.parseInt(linkCounts[1]) + maticVigilCount;
+                        int etherCount = Integer.parseInt(linkCounts[2]) + QuickNodeCount;
+                        int figmentCount = Integer.parseInt(linkCounts[3]) + etherCount;
+                        if (foundBotIndependentDoc.get("urlList") instanceof List) {
+                            for (int i = 0; i < (((List<?>) foundBotIndependentDoc.get("urlList")).size()); i++) {
+                                Object item = ((List<?>) foundBotIndependentDoc.get("urlList")).get(i);
+                                if (item instanceof String) {
+                                    if(i == 0) {
+                                        maticPrefix = (String) item;
+                                    } else if(i == 1) {
+                                        etherPrefix = (String) item;
+                                    } else if(i < maticVigilCount + 2) {
+                                        maticVigilWebSocketUrls.add((String) item);
+                                    } else if(i < QuickNodeCount + 2) {
+                                        quickNodeWebSocketUrls.add((String) item);
+                                    } else if (i < etherCount + 2) {
+                                        etherWebSocketUrls.add((String) item);
+                                    } else if (i < figmentCount + 2) {
+                                        figmentWebSocketUrls.add((String) item);
+                                    }
                                 }
                             }
                         }
+                        logsPrintStream.println("Read Urls : \n" + maticVigilWebSocketUrls + "\n" + quickNodeWebSocketUrls +
+                                "\n" + etherWebSocketUrls + "\n" + figmentWebSocketUrls);
+                        sendMessage(chatId, "Operation Successful");
+                    } catch (Exception e) {
+                        e.printStackTrace(logsPrintStream);
+                        sendMessage(chatId, "Operation Unsuccessful");
                     }
-                    sendMessage(chatId, "Operation Successful");
                 }
                 else if (text.toLowerCase().startsWith("settopupwallet")) {
                     try {
@@ -778,11 +796,12 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
         SendDocument sendDocument = new SendDocument();
         sendDocument.setChatId(chatId);
         logsPrintStream.flush();
-        sendDocument.setDocument(new InputFile().setMedia(new File("LBH_OutPutLogs.txt")));
+        sendDocument.setDocument(new InputFile().setMedia(new File("PS" + botType + "_OutPutLogs.txt")));
         sendDocument.setCaption("Latest Logs");
         try {
             execute(sendDocument);
         } catch (Exception e) {
+            sendMessage(chatId, "Error in sending Logs\n" + Arrays.toString(e.getStackTrace()));
             e.printStackTrace(logsPrintStream);
         }
     }
