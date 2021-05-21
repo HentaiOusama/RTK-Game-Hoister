@@ -83,7 +83,7 @@ public class PotShotBotGame implements Runnable {
     volatile boolean shouldContinueGame = true, hasGameClosed = false;
     volatile TransactionData lastCheckedTransactionData = null;
     private final Pot_Shot_Bot pot_shot_bot;
-    private final String chat_id;
+    private final String chat_id, botType;
     private final ScheduledExecutorService webSocketReconnectExecutorService = Executors.newSingleThreadScheduledExecutor();
     private int connectionCount = 0;
     private volatile boolean allowConnector = true;
@@ -103,12 +103,16 @@ public class PotShotBotGame implements Runnable {
     private BigInteger gasPrice, minGasFees, netCurrentPool = BigInteger.valueOf(0), prizePool = BigInteger.valueOf(0);
     ArrayList<String> last3CountedHash = new ArrayList<>();
     
-    PotShotBotGame(Pot_Shot_Bot pot_shot_bot, String chat_id, String EthNetworkType, String shotWallet, String[] RTKContractAddresses,
+    PotShotBotGame(Pot_Shot_Bot pot_shot_bot, String chat_id, String botType, String EthNetworkType, String shotWallet, String[] RTKContractAddresses,
                    BigInteger shotCost) {
         this.pot_shot_bot = pot_shot_bot;
         this.chat_id = chat_id;
+        this.botType = botType;
         this.EthNetworkType = EthNetworkType;
         this.shotWallet = shotWallet;
+        for(int i = 0; i < RTKContractAddresses.length; i++) {
+            RTKContractAddresses[i] = RTKContractAddresses[i].toLowerCase();
+        }
         this.RTKContractAddresses = Arrays.asList(RTKContractAddresses);
         this.shotCost = shotCost;
         shouldSendNotificationToMainRTKChat = EthNetworkType.toLowerCase().contains("mainnet");
@@ -175,34 +179,37 @@ public class PotShotBotGame implements Runnable {
                     transactionData = transactionsUnderReview.remove(0);
                     lastCheckedTransactionData = transactionData;
                     if (transactionData.didBurn) {
+                        String prizeWon = getPrizePool();
                         pot_shot_bot.enqueueMessageForSend(chat_id, String.format("""
+                                        PotShot%s:
                                         Hash :- %s, X = %s
-                                        Hunter %s got shot and claimed the pot.
-                                        💰 Prize Amount : %s""", trimHashAndAddy(transactionData.trxHash), transactionData.X,
-                                trimHashAndAddy(transactionData.fromAddress),
-                                getPrizePool()), transactionData, "https://media.giphy.com/media/RLAcIMgQ43fu7NP29d/giphy.gif",
-                                "https://media.giphy.com/media/OLhBtlQ8Sa3V5j6Gg9/giphy.gif",
-                                "https://media.giphy.com/media/2GkMCHQ4iz7QxlcRom/giphy.gif");
+                                        💥🔫 %s just got shot and won the pot!
+                                        🏆 Prize: %s""", botType, trimHashAndAddy(transactionData.trxHash), transactionData.X + 1,
+                                trimHashAndAddy(transactionData.fromAddress), prizeWon), transactionData);
+
+                        sendRewardToWinner(prizePool, transactionData.fromAddress);
+                        pot_shot_bot.enqueueMessageForSend(chat_id, "\uD83C\uDFB0 Left in jackpot: " + getPrizePool(), null);
 
                         if (shouldSendNotificationToMainRTKChat) {
                             pot_shot_bot.enqueueMessageForSend(mainRuletkaChatID, String.format("""
-                                        Hunter %s got shot and claimed : %s
-                                        Check out the group @%s""", trimHashAndAddy(transactionData.fromAddress), getPrizePool(),
-                                    pot_shot_bot.getBotUsername()), transactionData);
+                                        PotShot%s:
+                                        💥🔫 %s just got shot and won the pot!
+                                        🏆 Prize: %s
+                                        🎰 Left in jackpot: %s
+                                        Check out the group @%s""", botType, trimHashAndAddy(transactionData.fromAddress), prizeWon, getPrizePool(),
+                                    " USER NAME OF GRP "), transactionData); // Not yet Complete
                         }
-
-                        sendRewardToWinner(prizePool, transactionData.fromAddress);
-                        tryToSaveState();
                     } else {
                         addRTKToPot(transactionData.value, transactionData.fromAddress);
                         pot_shot_bot.enqueueMessageForSend(chat_id, String.format("""
-                                        Hash :- %s, X = %s
-                                        🔫 Close shot! Hunter %s tried to get the bounty, but missed their shot.
-                                        💰 Updated bounty: %s""", trimHashAndAddy(transactionData.trxHash), transactionData.X,
-                                trimHashAndAddy(transactionData.fromAddress), getPrizePool()), transactionData,
-                                "https://media.giphy.com/media/N4qR246iV3fVl2PwoI/giphy.gif");
+                                        PotShot%s:
+                                        Hash : %s, X = %s
+                                        🟡 %s just sent %s and survived!
+                                        🎰 Jackpot: %s""", botType, trimHashAndAddy(transactionData.trxHash), transactionData.X + 1,
+                                trimHashAndAddy(transactionData.fromAddress), getReadableRTKAmount(transactionData.value), getPrizePool()), transactionData);
                     }
                 }
+                tryToSaveState();
                 performProperWait(0.7);
             }
         } catch (Exception e) {
@@ -214,7 +221,6 @@ public class PotShotBotGame implements Runnable {
     }
     
 
-    // Fixed
     @SuppressWarnings({"SpellCheckingInspection", "BooleanMethodIsAlwaysInverted"})
     private boolean buildCustomBlockchainReader(boolean shouldSendMessage) {
 
@@ -446,7 +452,6 @@ public class PotShotBotGame implements Runnable {
             return currentTransactionData;
         }
         currentTransactionData.trxIndex = transaction.getTransactionIndex();
-        currentTransactionData.X = RTKContractAddresses.indexOf(log.getAddress().toLowerCase());
 
         // If method is transfer method
         if (method.equalsIgnoreCase("0xa9059cbb")) {
@@ -464,6 +469,7 @@ public class PotShotBotGame implements Runnable {
             Address toAddress = (Address) refMethod.invoke(null, inputData.substring(10, 74), 0, Address.class);
             Uint256 amount = (Uint256) refMethod.invoke(null, inputData.substring(74), 0, Uint256.class);
             currentTransactionData.toAddress = toAddress.toString().toLowerCase();
+            currentTransactionData.X = RTKContractAddresses.indexOf(currentTransactionData.toAddress.toLowerCase());
             currentTransactionData.value = amount.getValue();
         } else {
             currentTransactionData.methodName = "Useless";
@@ -496,7 +502,7 @@ public class PotShotBotGame implements Runnable {
                             return BigInteger.valueOf(65000L);
                         }
                     }).transfer(toAddress, amount).sendAsync().get();
-            String rewardMsg = "Reward is being sent. Trx id :- " + trxReceipt.getTransactionHash() +
+            String rewardMsg = "Reward is being sent. Trx Hash :- " + trxReceipt.getTransactionHash() +
                     "\n\n\nCode by : @OreGaZembuTouchiSuru";
             pot_shot_bot.logsPrintStream.println("Reward Sender Success. Msg :-\n" + rewardMsg);
             pot_shot_bot.enqueueMessageForSend(chat_id, rewardMsg, null);
@@ -514,7 +520,7 @@ public class PotShotBotGame implements Runnable {
     }
 
     public void sendBountyUpdateMessage(BigInteger amount) {
-        pot_shot_bot.sendMessage(chat_id, "Bounty Increased...LastBountyHunterGame Host added " + getPrizePool(amount.divide(BigInteger.valueOf(2)))
+        pot_shot_bot.sendMessage(chat_id, "Bounty Increased...LastBountyHunterGame Host added " + getReadableRTKAmount(amount.divide(BigInteger.valueOf(2)))
                 + " to the current Bounty");
     }
     
@@ -646,7 +652,7 @@ public class PotShotBotGame implements Runnable {
         return new BigDecimal(prizePool).divide(new BigDecimal(decimals), 3, RoundingMode.HALF_EVEN) + " RTK";
     }
 
-    private String getPrizePool(BigInteger amount) {
+    private String getReadableRTKAmount(BigInteger amount) {
         return new BigDecimal(amount).divide(new BigDecimal(decimals), 3, RoundingMode.HALF_EVEN) + " RTK";
     }
 }

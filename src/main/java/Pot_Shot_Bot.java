@@ -263,12 +263,14 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
                 messageSendingExecutor.scheduleWithFixedDelay(new Pot_Shot_Bot.MessageSender(), 0, 750, TimeUnit.MILLISECONDS);
                 switch (EthNetworkType) {
                     case "mainnet", "maticMainnet" -> {
-                        PotShotBotGame newPotShotBotGame = new PotShotBotGame(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
+                        PotShotBotGame newPotShotBotGame = new PotShotBotGame(this, actualGameChatId, botType, EthNetworkType,
+                                shotWallet, RTKContractAddresses, shotCost);
                         currentlyActiveGames.put(actualGameChatId, newPotShotBotGame);
                         gameRunningExecutorService.execute(newPotShotBotGame);
                     }
                     case "ropsten", "maticMumbai" -> {
-                        PotShotBotGame newPotShotBotGame = new PotShotBotGame(this, testingChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
+                        PotShotBotGame newPotShotBotGame = new PotShotBotGame(this, testingChatId, botType, EthNetworkType,
+                                shotWallet, RTKContractAddresses, shotCost);
                         currentlyActiveGames.put(testingChatId, newPotShotBotGame);
                         gameRunningExecutorService.execute(newPotShotBotGame);
                     }
@@ -298,7 +300,8 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
 
                     try {
                         if ((EthNetworkType.equals("mainnet") || EthNetworkType.equals("maticMainnet")) && !currentlyActiveGames.containsKey(actualGameChatId)) {
-                            PotShotBotGame newPotShotBotGame = new PotShotBotGame(this, actualGameChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
+                            PotShotBotGame newPotShotBotGame = new PotShotBotGame(this, actualGameChatId, botType, EthNetworkType,
+                                    shotWallet, RTKContractAddresses, shotCost);
                             currentlyActiveGames.put(actualGameChatId, newPotShotBotGame);
                             if (!gameRunningExecutorService.isShutdown()) {
                                 gameRunningExecutorService.shutdownNow();
@@ -307,7 +310,8 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
                             gameRunningExecutorService.execute(newPotShotBotGame);
                         }
                         else if ((EthNetworkType.equals("ropsten") || EthNetworkType.equals("maticMumbai")) && !currentlyActiveGames.containsKey(testingChatId)) {
-                            PotShotBotGame newPotShotBotGame = new PotShotBotGame(this, testingChatId, EthNetworkType, shotWallet, RTKContractAddresses, shotCost);
+                            PotShotBotGame newPotShotBotGame = new PotShotBotGame(this, testingChatId, botType, EthNetworkType,
+                                    shotWallet, RTKContractAddresses, shotCost);
                             currentlyActiveGames.put(testingChatId, newPotShotBotGame);
                             if (!gameRunningExecutorService.isShutdown()) {
                                 gameRunningExecutorService.shutdownNow();

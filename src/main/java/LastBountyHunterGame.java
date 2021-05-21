@@ -635,7 +635,7 @@ public class LastBountyHunterGame implements Runnable {
     }
 
     public void sendBountyUpdateMessage(BigInteger amount) {
-        last_bounty_hunter_bot.sendMessage(chat_id, "Bounty Increased...LastBountyHunterGame Host added " + getPrizePool(amount.divide(BigInteger.valueOf(2)))
+        last_bounty_hunter_bot.sendMessage(chat_id, "Bounty Increased...LastBountyHunterGame Host added " + getReadableRTKAmount(amount.divide(BigInteger.valueOf(2)))
                 + " to the current Bounty");
     }
 
@@ -643,7 +643,7 @@ public class LastBountyHunterGame implements Runnable {
         return new BigDecimal(prizePool).divide(new BigDecimal(decimals), 3, RoundingMode.HALF_EVEN) + " RTK";
     }
 
-    private String getPrizePool(BigInteger amount) {
+    private String getReadableRTKAmount(BigInteger amount) {
         return new BigDecimal(amount).divide(new BigDecimal(decimals), 3, RoundingMode.HALF_EVEN) + " RTK";
     }
 
@@ -943,7 +943,6 @@ public class LastBountyHunterGame implements Runnable {
         currentTransactionData.methodName = method;
         currentTransactionData.trxHash = transaction.getHash();
         currentTransactionData.trxIndex = transaction.getTransactionIndex();
-        currentTransactionData.X = RTKContractAddresses.indexOf(log.getAddress().toLowerCase());
         try {
             currentTransactionData.blockNumber = transaction.getBlockNumber();
             if (!currentTransactionData.blockNumber.equals(prevBlock)) {
@@ -979,6 +978,7 @@ public class LastBountyHunterGame implements Runnable {
             Address toAddress = (Address) refMethod.invoke(null, inputData.substring(10, 74), 0, Address.class);
             Uint256 amount = (Uint256) refMethod.invoke(null, inputData.substring(74), 0, Uint256.class);
             currentTransactionData.toAddress = toAddress.toString().toLowerCase();
+            currentTransactionData.X = RTKContractAddresses.indexOf(currentTransactionData.toAddress.toLowerCase());
             currentTransactionData.value = amount.getValue();
         } else {
             currentTransactionData.methodName = "Useless";
@@ -1041,7 +1041,7 @@ public class LastBountyHunterGame implements Runnable {
                             return BigInteger.valueOf(65000L);
                         }
                     }).transfer(toAddress, amount).sendAsync().get();
-            String rewardMsg = "Reward is being sent. Trx id :- " + trxReceipt.getTransactionHash() +
+            String rewardMsg = "Reward is being sent. Trx Hash :- " + trxReceipt.getTransactionHash() +
                     "\n\n\nCode by : @OreGaZembuTouchiSuru";
             last_bounty_hunter_bot.logsPrintStream.println("Reward Sender Success. Msg :-\n" + rewardMsg);
             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, rewardMsg, 50, null);
