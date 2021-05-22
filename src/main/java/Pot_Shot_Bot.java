@@ -574,7 +574,7 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
                         logsPrintStream.flush();
                     }
                     try {
-                        fileOutputStream = new FileOutputStream("LBH_OutPutLogs.txt");
+                        fileOutputStream = new FileOutputStream("PS" + botType + "_OutPutLogs.txt");
                     } catch (FileNotFoundException e) {
                         e.printStackTrace();
                     }

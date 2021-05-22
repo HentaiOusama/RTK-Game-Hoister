@@ -161,7 +161,7 @@ public class PotShotBotGame implements Runnable {
         webSocketReconnectExecutorService.scheduleWithFixedDelay(new PotShotBotGame.webSocketReconnect(), 0, 5000, TimeUnit.MILLISECONDS);
         
         try {
-            String mainRuletkaChatID = "-1001303208172";
+            String mainRuletkaChatID = "-1001303208172"; // Not yet Complete
             
             while (shouldContinueGame) {
 
