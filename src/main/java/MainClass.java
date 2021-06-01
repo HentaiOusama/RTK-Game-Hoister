@@ -42,6 +42,8 @@ public class MainClass {
         try {
             TelegramBotsApi telegramBotsApi = new TelegramBotsApi(DefaultBotSession.class);
             telegramBotsApi.registerBot(new Last_Bounty_Hunter_Bot(System.getenv("LBHPublicKey")));
+            telegramBotsApi.registerBot(new Pot_Shot_Bot("High", System.getenv("PSBHPublicKey")));
+            //telegramBotsApi.registerBot(new Pot_Shot_Bot("Low", System.getenv("PSBLPublicKey")));
         } catch (Exception e) {
             e.printStackTrace();
         }

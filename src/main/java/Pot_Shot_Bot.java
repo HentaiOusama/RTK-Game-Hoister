@@ -67,7 +67,7 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
     // Game manager variable
     private boolean shouldRunGame;
     private ArrayList<Long> allAdmins = new ArrayList<>();
-    private final String testingChatId = "-1001477389485", actualGameChatId = "-1001477389485"; // Not yet Complete
+    private final String testingChatId = "-1001477389485", actualGameChatId = "-1001470156156";
     private boolean shouldAllowMessageFlow = true;
     String topUpWalletAddress;
     volatile TransactionData lastSavedStateTransactionData = null;
@@ -643,8 +643,8 @@ public class Pot_Shot_Bot extends TelegramLongPollingBot {
 
     @Override
     public String getBotUsername() {
-        return "HentaiOusamaTestBot";
-    } // Not yet complete
+        return "PotShot" + botType +"Bot";
+    }
 
     @Override
     public String getBotToken() {

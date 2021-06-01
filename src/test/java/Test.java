@@ -25,13 +25,14 @@ public class Test {
 
     public static void main(String[] args) {
         try {
-            
             RTKContractAddresses = Arrays.asList("0x38332D8671961aE13d0BDe040d536eB336495eEA",
                     "0x136A5c9B9965F3827fbB7A9e97E41232Df168B08", "0xfB8C59fe95eB7e0a2fA067252661687df67d87b8",
                     "0x99afe8FDEd0ef57845F126eEFa945d687CdC052d", "0x88dD15CEac31a828e06078c529F5C1ABB214b6E8");
-            
+
+            String uri = System.getenv("tempUri1");
+            System.out.println("Uri Used : " + uri);
             WebSocketService webSocketService = new WebSocketService(new WebSocketClient(
-                    new URI(System.getenv("tempUri"))), true);
+                    new URI(uri)), true);
             webSocketService.connect();
             web3j = Web3j.build(webSocketService);
 
@@ -64,6 +65,7 @@ public class Test {
                         }).transfer("0xf7C1f4cA54D64542061E6f53A9D38E2f5A6A4Ecc",
                         new BigInteger("1000000000000000")).sendAsync().get();
                 System.out.println("TrxHash : " + trxReceipt.getTransactionHash());
+                System.exit(0);
             }
 
             BigInteger latestBlock = web3j.ethBlockNumber().send().getBlockNumber();

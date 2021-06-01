@@ -71,7 +71,7 @@
                 <artifactId>heroku-maven-plugin</artifactId>
                 <version>3.0.4</version>
                 <configuration>
-                    <appName>last-bounty-hunter-bot</appName>
+                    <appName>rtk-game-hoster-1</appName>
                     <includes>
                         <include>LBH_OutPutLogs.txt</include>
                         <include>PSHigh_OutPutLogs.txt</include>

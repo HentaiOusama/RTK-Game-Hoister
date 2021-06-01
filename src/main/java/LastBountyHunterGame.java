@@ -196,7 +196,7 @@ public class LastBountyHunterGame implements Runnable {
                 last_bounty_hunter_bot.enqueueMessageForSend(chat_id, "Warning! The bot is running on MATIC Testnet network and not on Mainnet", -1, null);
             }
             last_bounty_hunter_bot.enqueueMessageForSend(chat_id, String.format("""
-                        Welcome to the Last Bounty Hunter lastBountyHunterGame.
+                        Welcome to the Last Bounty Hunter Game.
                         Do you have what it takes to be the Last Bounty Hunter?
                                         
                         Latest Prize Pool : %s
@@ -1180,8 +1180,9 @@ public class LastBountyHunterGame implements Runnable {
             BigInteger gasPrice = web3j.ethGasPrice().send().getGasPrice();
             String hash;
 
-            ERC20.load(RTKContractAddresses.get(X - 1), web3j, Credentials.create(System.getenv("LBHPrivateKey")),
-                    new ContractGasProvider() {
+            RawTransactionManager rawTransactionManager = new RawTransactionManager(web3j, Credentials.create(System.getenv("LBHPrivateKey")),
+                    web3j.ethChainId().send().getChainId().longValue());
+            ERC20.load(RTKContractAddresses.get(X - 1), web3j, rawTransactionManager, new ContractGasProvider() {
                         @Override
                         public BigInteger getGasPrice(String s) {
                             return gasPrice;
@@ -1201,14 +1202,13 @@ public class LastBountyHunterGame implements Runnable {
                         public BigInteger getGasLimit() {
                             return BigInteger.valueOf(100000L);
                         }
-                    }).approve(last_bounty_hunter_bot.swapContractAddress, new BigInteger(_amount)).send();
+                    })
+                    .approve(last_bounty_hunter_bot.swapContractAddress, new BigInteger(_amount)).send();
 
             Function function = new Function("convertRTKLXIntoRTK", Arrays.asList(new Address(shotWallet), new Uint256(amount), new Uint256(X)),
                     Collections.singletonList(new TypeReference<Bool>() {
             }));
 
-            RawTransactionManager rawTransactionManager = new RawTransactionManager(web3j, Credentials.create(System.getenv("LBHPrivateKey")),
-                    web3j.ethChainId().send().getChainId().longValue());
             hash = rawTransactionManager.sendTransaction(gasPrice, new BigInteger("950000"), last_bounty_hunter_bot.swapContractAddress,
                     FunctionEncoder.encode(function), BigInteger.ZERO).getTransactionHash();
 

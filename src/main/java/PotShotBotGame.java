@@ -135,6 +135,9 @@ public class PotShotBotGame implements Runnable {
 
         pot_shot_bot.logsPrintStream.println("Last Game Last Checked TrxData ===>> " + lastCheckedTransactionData);
 
+        pot_shot_bot.enqueueMessageForSend(chat_id, "PotShot" + botType + "\nShot cost : " + getReadableRTKAmount(shotCost) +
+                "\n\nBot Wallet : ", null);
+        pot_shot_bot.enqueueMessageForSend(chat_id, shotWallet, null);
         if(!buildCustomBlockchainReader(true)) {
             pot_shot_bot.sendMessage(chat_id, "Error encountered while trying to connect to ethereum network. Cancelling the " +
                     "lastBountyHunterGame.");
@@ -161,7 +164,7 @@ public class PotShotBotGame implements Runnable {
         webSocketReconnectExecutorService.scheduleWithFixedDelay(new PotShotBotGame.webSocketReconnect(), 0, 5000, TimeUnit.MILLISECONDS);
         
         try {
-            String mainRuletkaChatID = "-1001303208172"; // Not yet Complete
+            String mainRuletkaChatID = "-1001303208172";
             
             while (shouldContinueGame) {
 
@@ -198,7 +201,7 @@ public class PotShotBotGame implements Runnable {
                                         🏆 Prize: %s
                                         🎰 Left in jackpot: %s
                                         Check out the group @%s""", botType, trimHashAndAddy(transactionData.fromAddress), prizeWon, getPrizePool(),
-                                    " USER NAME OF GRP "), transactionData); // Not yet Complete
+                                    "RTKPotShot"), transactionData);
                         }
                     } else {
                         addRTKToPot(transactionData.value, transactionData.fromAddress);
