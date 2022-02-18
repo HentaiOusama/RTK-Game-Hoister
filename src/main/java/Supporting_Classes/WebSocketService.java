@@ -430,12 +430,10 @@ public class WebSocketService implements Web3jService {
 
         if (!idField.isIntegralNumber()) {
             if(idField.isTextual()) {
-                System.out.println("Textual Request ID Found");
-                String string = idField.asText();
                 try {
-                    return Long.parseLong(string);
+                    return Long.parseLong(idField.asText());
                 } catch (Exception e) {
-                    throw new IOException(String.format("'id' expected to be long, but it is: '%s'", idField.asText()));
+                    throw new IOException(String.format("Found Textual 'id' that cannot be casted to long. Input : '%s'", idField.asText()));
                 }
             } else {
                 throw new IOException(

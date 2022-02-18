@@ -978,7 +978,7 @@ public class LastBountyHunterGame implements Runnable {
             Address toAddress = (Address) refMethod.invoke(null, inputData.substring(10, 74), 0, Address.class);
             Uint256 amount = (Uint256) refMethod.invoke(null, inputData.substring(74), 0, Uint256.class);
             currentTransactionData.toAddress = toAddress.toString().toLowerCase();
-            currentTransactionData.X = RTKContractAddresses.indexOf(currentTransactionData.toAddress.toLowerCase());
+            currentTransactionData.X = RTKContractAddresses.indexOf(log.getAddress().toLowerCase());
             currentTransactionData.value = amount.getValue();
         } else {
             currentTransactionData.methodName = "Useless";
